@@ -1,103 +1,349 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
-/// Edit this file to define custom logic or remove it if it is not needed.
-/// Learn more about FRAME and the core library of Substrate FRAME pallets:
-/// https://substrate.dev/docs/en/knowledgebase/runtime/frame
-
 use frame_support::{decl_module, decl_storage, decl_event, decl_error, dispatch, traits::Get};
 use frame_system::ensure_signed;
+use codec::{ Encode, Decode };
+use sp_core::U256;
 
 #[cfg(test)]
 mod mock;
 
-#[cfg(test)]
-mod tests;
-
-/// Configure the pallet by specifying the parameters and types on which it depends.
 pub trait Config: frame_system::Config {
-	/// Because this pallet emits events, it depends on the runtime's definition of an event.
 	type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
+	type ADMIN1: Get<<Self as frame_system::Config>::AccountId>;
+	type ADMIN2: Get<<Self as frame_system::Config>::AccountId>;
 }
 
-// The pallet's runtime storage items.
-// https://substrate.dev/docs/en/knowledgebase/runtime/storage
-decl_storage! {
-	// A unique name is used to ensure that the pallet's storage items are isolated.
-	// This name may be updated, but each pallet in the runtime must use a unique name.
-	// ---------------------------------vvvvvvvvvvvvvv
-	trait Store for Module<T: Config> as TemplateModule {
-		// Learn more about declaring storage items:
-		// https://substrate.dev/docs/en/knowledgebase/runtime/storage#declaring-storage-items
-		Something get(fn something): Option<u32>;
-	}
-}
+const ACK1: u8 = 1u8;
+const ACK2: u8 = 2u8;
+const NACK: u8 = ACK1 | ACK2;
 
-// Pallets use events to inform users when important changes are made.
-// https://substrate.dev/docs/en/knowledgebase/runtime/events
+type TokenAddr = U256;
+type Amount = U256;
+type NonceId = U256;
+type ReqId = U256;
+type L1Account = U256;
+
 decl_event!(
 	pub enum Event<T> where AccountId = <T as frame_system::Config>::AccountId {
-		/// Event documentation should end with an array that provides descriptive names for event
-		/// parameters. [something, who]
-		SomethingStored(u32, AccountId),
+		SwapReq(ReqId, AccountId, TokenAddr, TokenAddr, Amount, Amount, NonceId),
+		PoolSupplyReq(ReqId, AccountId, TokenAddr, TokenAddr, Amount, Amount, NonceId),
+		PoolRetrieveReq(ReqId, AccountId, TokenAddr, TokenAddr, Amount, Amount, NonceId),
+		WithdrawReq(ReqId, AccountId, L1Account, TokenAddr, Amount, NonceId, Amount),
+		Deposit(ReqId, AccountId, TokenAddr, Amount, NonceId, Amount),
+		Ack(ReqId, u8),
+		Abort(ReqId),
 	}
 );
 
-// Errors inform users that something went wrong.
-decl_error! {
-	pub enum Error for Module<T: Config> {
-		/// Error names should be descriptive.
-		NoneValue,
-		/// Errors should have helpful documentation associated with them.
-		StorageOverflow,
+#[derive(Encode, Decode, Clone, PartialEq)]
+pub enum Ops<T: frame_system::Config> {
+	Deposit(T::AccountId, TokenAddr, Amount, NonceId, Amount),
+	/// account, from, to, amount_from, amount_to, nonce
+	Swap(T::AccountId, TokenAddr, TokenAddr, Amount, Amount, NonceId),
+	/// account, from, to, amount_from, amount_to, nonce
+	PoolSupply(T::AccountId, TokenAddr, TokenAddr, Amount, Amount, NonceId),
+	/// account, from, to, amount_from, amount_to, nonce
+	PoolRetrieve(T::AccountId, TokenAddr, TokenAddr, Amount, Amount, NonceId),
+	/// account, token, amount, nonce
+	Withdraw(T::AccountId, L1Account, TokenAddr, Amount, NonceId, Amount),
+}
+
+decl_storage! {
+	trait Store for Module<T: Config> as SimpleMap {
+		pub BalanceMap get(fn balance_map): map hasher(blake2_128_concat) (T::AccountId, TokenAddr) => Amount;
+		pub ShareMap get(fn share_map): map hasher(blake2_128_concat) (T::AccountId, (TokenAddr, TokenAddr)) => Amount;
+		pub PoolMap get(fn pool_map): map hasher(blake2_128_concat) (TokenAddr, TokenAddr) => (Amount, Amount);
+		pub PendingReqMap get(fn pending_req_map): map hasher(blake2_128_concat) ReqId => Option<Ops<T>>;
+		pub AckMap get(fn ack_map): map hasher(blake2_128_concat) ReqId => u8;
+		pub ReqIndex get(fn req_index): ReqId;
+		pub NonceMap get(fn nonce_map): map hasher(blake2_128_concat) T::AccountId => NonceId;
 	}
 }
 
-// Dispatchable functions allows users to interact with the pallet and invoke state changes.
-// These functions materialize as "extrinsics", which are often compared to transactions.
-// Dispatchable functions must be annotated with a weight and must return a DispatchResult.
+decl_error! {
+	pub enum Error for Module<T: Config> {
+		NoneValue,
+		BalanceOverflow,
+		BalanceNotEnough,
+		PoolBalanceNotEnough,
+		PoolBalanceOverflow,
+		ShareOverflow,
+		ShareNotEnough,
+		ReqIdOverflow,
+		InvalidReqId,
+		NotImplemented,
+		NonceInconsistent,
+		NonceOverflow,
+	}
+}
+
+fn nonce_check<T: Config>(account: &T::AccountId, nonce: NonceId) -> Result<NonceId, Error::<T>> {
+	if nonce != NonceMap::<T>::get(account) {
+		return Err(Error::<T>::NonceInconsistent);
+	}
+
+	let new_nonce = nonce.checked_add(U256::from(1)).ok_or(Error::<T>::NonceOverflow)?;
+	return Ok(new_nonce);
+}
+
+fn balance_add<T: Config>(account: &T::AccountId, token_address: TokenAddr, amount: Amount) -> Result<Amount, Error::<T>> {
+	let new_amount = BalanceMap::<T>::get((&account, &token_address)).checked_add(amount).ok_or(Error::<T>::BalanceOverflow)?;
+	return Ok(new_amount);
+}
+
+fn balance_sub<T: Config>(account: &T::AccountId, token_address: TokenAddr, amount: Amount) -> Result<Amount, Error::<T>> {
+	let new_amount = BalanceMap::<T>::get((&account, &token_address)).checked_sub(amount).ok_or(Error::<T>::BalanceNotEnough)?;
+	return Ok(new_amount);
+}
+
+fn req_id_get<T: Config>() -> Result<ReqId, Error::<T>> {
+	let req_id = ReqIndex::get().checked_add(U256::from(1)).ok_or(Error::<T>::ReqIdOverflow)?;
+	return Ok(req_id);
+}
+
 decl_module! {
 	pub struct Module<T: Config> for enum Call where origin: T::Origin {
-		// Errors must be initialized if they are used by the pallet.
 		type Error = Error<T>;
-
-		// Events must be initialized if they are used by the pallet.
 		fn deposit_event() = default;
 
-		/// An example dispatchable that takes a singles value as a parameter, writes the value to
-		/// storage and emits an event. This function must be dispatched by a signed extrinsic.
 		#[weight = 10_000 + T::DbWeight::get().writes(1)]
-		pub fn do_something(origin, something: u32) -> dispatch::DispatchResult {
-			// Check that the extrinsic was signed and get the signer.
-			// This function will return an error if the extrinsic is not signed.
-			// https://substrate.dev/docs/en/knowledgebase/runtime/origin
-			let who = ensure_signed(origin)?;
-
-			// Update storage.
-			Something::put(something);
-
-			// Emit an event.
-			Self::deposit_event(RawEvent::SomethingStored(something, who));
-			// Return a successful DispatchResult
-			Ok(())
-		}
-
-		/// An example dispatchable that may throw a custom error.
-		#[weight = 10_000 + T::DbWeight::get().reads_writes(1,1)]
-		pub fn cause_error(origin) -> dispatch::DispatchResult {
+		pub fn deposit(
+			origin,
+			account: T::AccountId,
+			token_address: TokenAddr,
+			amount: Amount,
+			nonce: NonceId
+		) -> dispatch::DispatchResult {
 			let _who = ensure_signed(origin)?;
 
-			// Read a value from storage.
-			match Something::get() {
-				// Return an error if the value has not been set.
-				None => Err(Error::<T>::NoneValue)?,
-				Some(old) => {
-					// Increment the value read from storage; will error in the event of overflow.
-					let new = old.checked_add(1).ok_or(Error::<T>::StorageOverflow)?;
-					// Update the value in storage with the incremented result.
-					Something::put(new);
-					Ok(())
-				},
+			let _new_nonce = nonce_check::<T>(&_who, nonce)?;
+			let _req_id = req_id_get::<T>()?;
+
+			let _new_amount = balance_add::<T>(&account, token_address, amount)?;
+
+			let op = Ops::Deposit(account.clone(), token_address, amount, nonce, _new_amount.clone());
+			PendingReqMap::<T>::insert(&_req_id, op);
+			ReqIndex::put(_req_id);
+
+			NonceMap::<T>::insert(&_who, _new_nonce);
+			Self::deposit_event(Event::<T>::Deposit(_req_id, account, token_address, amount, nonce, _new_amount));
+
+			return Ok(());
+		}
+
+		#[weight = 10_000 + T::DbWeight::get().writes(1)]
+		pub fn swap(
+			origin,
+			account: T::AccountId,
+			token_from: TokenAddr,
+			token_to: TokenAddr,
+			amount: Amount,
+			nonce: NonceId
+		) -> dispatch::DispatchResult {
+			let _who = ensure_signed(origin)?;
+
+			let _req_id = req_id_get::<T>()?;
+			let _new_nonce = nonce_check::<T>(&account, nonce)?;
+			let _new_amount_from = balance_sub::<T>(&account, token_from, amount)?;
+
+			let (new_pool_amount, pool_index) =
+				if token_from > token_to {
+					let index = (&token_to, &token_from);
+					let (mut pool_amount_to, mut pool_amount_from) = PoolMap::get(index);
+					pool_amount_from = pool_amount_from.checked_add(amount).ok_or(Error::<T>::PoolBalanceOverflow)?;
+					pool_amount_to = pool_amount_to.checked_sub(amount).ok_or(Error::<T>::PoolBalanceNotEnough)?;
+					((pool_amount_to, pool_amount_from), index)
+				} else {
+					let index = (&token_from, &token_to);
+					let (mut pool_amount_from, mut pool_amount_to) = PoolMap::get(index);
+					pool_amount_from = pool_amount_from.checked_add(amount).ok_or(Error::<T>::PoolBalanceOverflow)?;
+					pool_amount_to = pool_amount_to.checked_sub(amount).ok_or(Error::<T>::PoolBalanceNotEnough)?;
+					((pool_amount_from, pool_amount_to), index)
+				};
+
+			let op = Ops::Swap(account.clone(), token_from, token_to, amount, amount, nonce);
+			PendingReqMap::<T>::insert(&_req_id, op);
+			ReqIndex::put(_req_id);
+
+			BalanceMap::<T>::insert((&account, token_from), _new_amount_from);
+			PoolMap::insert(pool_index, new_pool_amount);
+			NonceMap::<T>::insert(&account, _new_nonce);
+
+			Self::deposit_event(Event::<T>::SwapReq(_req_id, account.clone(), token_from, token_to, amount, amount, nonce));
+			return Ok(());
+		}
+
+		#[weight = 10_000 + T::DbWeight::get().writes(1)]
+		pub fn pool_supply(
+			origin,
+			account: T::AccountId,
+			token_from: TokenAddr,
+			token_to: TokenAddr,
+			amount_from: Amount,
+			amount_to: Amount,
+			nonce: NonceId
+		) -> dispatch::DispatchResult {
+			let _who = ensure_signed(origin)?;
+
+			let _req_id = req_id_get::<T>()?;
+			let _new_nonce = nonce_check::<T>(&account, nonce)?;
+			let _new_amount_from = balance_sub::<T>(&account, token_from, amount_from)?;
+			let _new_amount_to = balance_sub::<T>(&account, token_to, amount_to)?;
+
+			let (new_pool_amount, pool_index) =
+				if token_from > token_to {
+					let index = (&token_to, &token_from);
+					let (mut pool_amount_to, mut pool_amount_from) = PoolMap::get(index);
+					pool_amount_from = pool_amount_from.checked_add(amount_from).ok_or(Error::<T>::PoolBalanceOverflow)?;
+					pool_amount_to = pool_amount_to.checked_add(amount_to).ok_or(Error::<T>::PoolBalanceOverflow)?;
+					((pool_amount_to, pool_amount_from), index)
+				} else {
+					let index = (&token_from, &token_to);
+					let (mut pool_amount_from, mut pool_amount_to) = PoolMap::get(index);
+					pool_amount_from = pool_amount_from.checked_add(amount_from).ok_or(Error::<T>::PoolBalanceOverflow)?;
+					pool_amount_to = pool_amount_to.checked_add(amount_to).ok_or(Error::<T>::PoolBalanceOverflow)?;
+					((pool_amount_from, pool_amount_to), index)
+				};
+
+			let _new_stock =
+				ShareMap::<T>::get((&account, pool_index))
+					.checked_add(amount_from).ok_or(Error::<T>::ShareOverflow)?
+					.checked_add(amount_to).ok_or(Error::<T>::ShareOverflow)?;
+
+			let op = Ops::PoolSupply(account.clone(), token_from, token_to, amount_from, amount_to, nonce);
+			PendingReqMap::<T>::insert(&_req_id, op);
+			ReqIndex::put(_req_id);
+
+			BalanceMap::<T>::insert((&account, token_from), _new_amount_from);
+			BalanceMap::<T>::insert((&account, token_to), _new_amount_to);
+			PoolMap::insert(pool_index, new_pool_amount);
+			ShareMap::<T>::insert((&account, pool_index), _new_stock);
+			NonceMap::<T>::insert(&account, _new_nonce);
+
+			Self::deposit_event(Event::<T>::PoolSupplyReq(_req_id, account, token_from, token_to, amount_from, amount_to, nonce));
+
+			return Ok(());
+		}
+
+		#[weight = 10_000 + T::DbWeight::get().writes(1)]
+		pub fn pool_retrieve(
+			origin,
+			account: T::AccountId,
+			token_from: TokenAddr,
+			token_to: TokenAddr,
+			amount_from: Amount,
+			amount_to: Amount,
+			nonce: NonceId
+		) -> dispatch::DispatchResult {
+			let _who = ensure_signed(origin)?;
+
+			let _req_id = req_id_get::<T>()?;
+			let _new_nonce = nonce_check::<T>(&account, nonce)?;
+
+			let (new_pool_amount, pool_index) =
+				if token_from > token_to {
+					let index = (&token_to, &token_from);
+					let (mut pool_amount_to, mut pool_amount_from) = PoolMap::get(index);
+					pool_amount_from = pool_amount_from.checked_sub(amount_from).ok_or(Error::<T>::PoolBalanceNotEnough)?;
+					pool_amount_to = pool_amount_to.checked_sub(amount_to).ok_or(Error::<T>::PoolBalanceNotEnough)?;
+					((pool_amount_to, pool_amount_from), index)
+				} else {
+					let index = (&token_from, &token_to);
+					let (mut pool_amount_from, mut pool_amount_to) = PoolMap::get(index);
+					pool_amount_from = pool_amount_from.checked_sub(amount_from).ok_or(Error::<T>::PoolBalanceNotEnough)?;
+					pool_amount_to = pool_amount_to.checked_sub(amount_to).ok_or(Error::<T>::PoolBalanceNotEnough)?;
+					((pool_amount_from, pool_amount_to), index)
+				};
+
+			let _new_stock =
+				ShareMap::<T>::get((&account, pool_index))
+					.checked_sub(amount_from).ok_or(Error::<T>::ShareNotEnough)?
+					.checked_sub(amount_to).ok_or(Error::<T>::ShareNotEnough)?;
+
+			let op = Ops::PoolRetrieve(account.clone(), token_from, token_to, amount_from, amount_to, nonce);
+			PendingReqMap::<T>::insert(&_req_id, op);
+			ReqIndex::put(_req_id);
+
+			PoolMap::insert(pool_index, new_pool_amount);
+			ShareMap::<T>::insert((&account, pool_index), _new_stock);
+			NonceMap::<T>::insert(&account, _new_nonce);
+
+			Self::deposit_event(Event::<T>::PoolRetrieveReq(_req_id, account, token_from, token_to, amount_from, amount_to, nonce));
+
+			return Ok(());
+		}
+
+		#[weight = 10_000 + T::DbWeight::get().writes(1)]
+		pub fn withdraw(
+			origin,
+			account: T::AccountId,
+			l1account: L1Account,
+			token_address: TokenAddr,
+			amount: Amount,
+			nonce: NonceId
+		) -> dispatch::DispatchResult {
+			let _who = ensure_signed(origin)?;
+
+			let _req_id = req_id_get::<T>()?;
+			let _new_nonce = nonce_check::<T>(&account, nonce)?;
+			let _new_amount = balance_sub::<T>(&account, token_address, amount)?;
+
+			let op = Ops::Withdraw(account.clone(), l1account, token_address, amount, nonce, _new_amount);
+			PendingReqMap::<T>::insert(&_req_id, op);
+			ReqIndex::put(_req_id);
+
+			BalanceMap::<T>::insert((&account, token_address), _new_amount);
+			NonceMap::<T>::insert(&account, _new_nonce);
+
+			Self::deposit_event(Event::<T>::WithdrawReq(_req_id, account, l1account, token_address, amount, nonce, _new_amount));
+
+			return Ok(());
+		}
+
+		#[weight = 10_000 + T::DbWeight::get().writes(1)]
+		pub fn ack(
+			origin,
+			req_id: ReqId
+		) -> dispatch::DispatchResult {
+			let _who = ensure_signed(origin)?;
+			let mut acks = AckMap::get(&req_id);
+
+			if _who == T::ADMIN1::get() {
+				acks = acks | ACK1;
 			}
+
+			if _who == T::ADMIN2::get() {
+				acks = acks | ACK2;
+			}
+
+			AckMap::insert(&req_id, &acks);
+
+			if acks == NACK {
+				let op = PendingReqMap::<T>::get(&req_id).ok_or(Error::<T>::InvalidReqId)?;
+				match op {
+					Ops::Deposit(_account, _token, _amount, _nonce, _) => {
+						let new_balance_to = balance_add::<T>(&_account, _token, _amount)?;
+						BalanceMap::<T>::insert((&_account, _token), new_balance_to);
+					},
+					Ops::Swap(_account, _token_from, _token_to, _amount_from, _amount_to, _nonce) => {
+						let new_balance_to = balance_add::<T>(&_account, _token_to, _amount_to)?;
+						BalanceMap::<T>::insert((&_account, _token_to), new_balance_to);
+					},
+					Ops::PoolRetrieve(_account, _token_from, _token_to, _amount_from, _amount_to, _nonce) => {
+						let new_balance_from = balance_add::<T>(&_account, _token_from, _amount_from)?;
+						let new_balance_to = balance_add::<T>(&_account, _token_to, _amount_to)?;
+						BalanceMap::<T>::insert((&_account, _token_from), new_balance_from);
+						BalanceMap::<T>::insert((&_account, _token_to), new_balance_to);
+					},
+					_ => (),
+				};
+
+				PendingReqMap::<T>::remove(&req_id);
+			}
+
+			Self::deposit_event(RawEvent::Ack(req_id, acks));
+			return Ok(());
 		}
 	}
 }

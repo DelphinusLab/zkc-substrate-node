@@ -20,6 +20,8 @@ use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use pallet_grandpa::{AuthorityId as GrandpaId, AuthorityList as GrandpaAuthorityList};
 use pallet_grandpa::fg_primitives;
 use sp_version::RuntimeVersion;
+use hex_literal;
+
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
 
@@ -259,9 +261,16 @@ impl pallet_sudo::Config for Runtime {
 	type Call = Call;
 }
 
+parameter_types! {
+	pub ADMIN1: AccountId = AccountId::from(hex_literal::hex!["d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d"]);
+	pub ADMIN2: AccountId = AccountId::from(hex_literal::hex!["be5ddb1579b72e84524fc29e78609e3caf42e85aa118ebfe0b0ad404b5bdd25f"]);
+}
+
 /// Configure the template pallet in pallets/template.
 impl pallet_template::Config for Runtime {
 	type Event = Event;
+	type ADMIN1 = ADMIN1;
+	type ADMIN2 = ADMIN2;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
