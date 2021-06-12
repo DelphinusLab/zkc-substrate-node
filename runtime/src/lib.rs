@@ -41,8 +41,8 @@ pub use frame_support::{
 };
 use pallet_transaction_payment::CurrencyAdapter;
 
-/// Import the template pallet.
-pub use pallet_template;
+/// Import the swap pallet.
+pub use pallet_swap;
 
 /// An index to a block.
 pub type BlockNumber = u32;
@@ -95,8 +95,8 @@ pub mod opaque {
 }
 
 pub const VERSION: RuntimeVersion = RuntimeVersion {
-	spec_name: create_runtime_str!("node-template"),
-	impl_name: create_runtime_str!("node-template"),
+	spec_name: create_runtime_str!("node-swap"),
+	impl_name: create_runtime_str!("node-swap"),
 	authoring_version: 1,
 	spec_version: 100,
 	impl_version: 1,
@@ -266,8 +266,8 @@ parameter_types! {
 	pub ADMIN2: AccountId = AccountId::from(hex_literal::hex!["be5ddb1579b72e84524fc29e78609e3caf42e85aa118ebfe0b0ad404b5bdd25f"]);
 }
 
-/// Configure the template pallet in pallets/template.
-impl pallet_template::Config for Runtime {
+/// Configure the swap pallet in pallets/swap.
+impl pallet_swap::Config for Runtime {
 	type Event = Event;
 	type ADMIN1 = ADMIN1;
 	type ADMIN2 = ADMIN2;
@@ -288,8 +288,8 @@ construct_runtime!(
 		Balances: pallet_balances::{Module, Call, Storage, Config<T>, Event<T>},
 		TransactionPayment: pallet_transaction_payment::{Module, Storage},
 		Sudo: pallet_sudo::{Module, Call, Config<T>, Storage, Event<T>},
-		// Include the custom logic from the template pallet in the runtime.
-		TemplateModule: pallet_template::{Module, Call, Storage, Event<T>},
+		// Include the custom logic from the swap pallet in the runtime.
+		SwapModule: pallet_swap::{Module, Call, Storage, Event<T>},
 	}
 );
 
