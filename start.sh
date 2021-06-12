@@ -1,1 +1,1 @@
-./target/release/node-template --dev --ws-external
+./target/release/node-swap --dev --ws-external

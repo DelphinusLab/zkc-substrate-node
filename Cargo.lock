@@ -3482,13 +3482,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "node-template"
+name = "node-swap"
 version = "3.0.0"
 dependencies = [
  "frame-benchmarking",
  "frame-benchmarking-cli",
  "jsonrpc-core",
- "node-template-runtime",
+ "node-swap-runtime",
  "pallet-transaction-payment-rpc",
  "sc-basic-authorship",
  "sc-cli",
@@ -3518,7 +3518,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "node-template-runtime"
+name = "node-swap-runtime"
 version = "3.0.0"
 dependencies = [
  "frame-benchmarking",
@@ -3533,7 +3533,7 @@ dependencies = [
  "pallet-grandpa",
  "pallet-randomness-collective-flip",
  "pallet-sudo",
- "pallet-template",
+ "pallet-swap",
  "pallet-timestamp",
  "pallet-transaction-payment",
  "pallet-transaction-payment-rpc-runtime-api",
@@ -3807,7 +3807,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "pallet-template"
+name = "pallet-swap"
 version = "3.0.0"
 dependencies = [
  "frame-support",
