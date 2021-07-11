@@ -213,13 +213,13 @@ decl_module! {
 					let (pool_balance_to, pool_balance_from) = PoolMap::get(_pool_index);
 					let new_pool_balance_from = pool_balance_from.checked_sub(amount).ok_or(Error::<T>::PoolBalanceNotEnough)?;
 					let new_pool_balance_to = pool_balance_to.checked_add(amount).ok_or(Error::<T>::PoolBalanceOverflow)?;			
-					PoolMap::insert(_pool_index, (pool_balance_to, pool_balance_from));
+					PoolMap::insert(_pool_index, (new_pool_balance_to, new_pool_balance_from));
 					(new_pool_balance_to, new_pool_balance_from)
 				} else if token_from < token_to {
 					let (pool_balance_from, pool_balance_to) = PoolMap::get(_pool_index);
 					let new_pool_balance_from = pool_balance_from.checked_sub(amount).ok_or(Error::<T>::PoolBalanceNotEnough)?;
 					let new_pool_balance_to = pool_balance_to.checked_add(amount).ok_or(Error::<T>::PoolBalanceOverflow)?;			
-					PoolMap::insert(_pool_index, (pool_balance_from, pool_balance_to));
+					PoolMap::insert(_pool_index, (new_pool_balance_from, new_pool_balance_to));
 					(new_pool_balance_from, new_pool_balance_to)
 				} else {
 					Err(Error::<T>::InvalidPool)?

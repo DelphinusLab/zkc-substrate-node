@@ -1,1 +1,1 @@
-./target/release/node-swap --dev --ws-external
+./target/release/node-swap --dev --ws-external --tmp
