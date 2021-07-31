@@ -17,12 +17,15 @@ pub trait Config: frame_system::Config {
 const ACK1: u8 = 1u8;
 const ACK2: u8 = 2u8;
 const NACK: u8 = ACK1 | ACK2;
+const PENDING: u8 = 1u8;
+const DONE: u8 = 2u8;
 
 type TokenAddr = U256;
 type NonceId = U256;
 type ReqId = U256;
 type L1Account = U256;
 type Amount = U256;
+type L1TxHash = U256;
 
 decl_event!(
 	pub enum Event<T> where AccountId = <T as frame_system::Config>::AccountId {
@@ -40,7 +43,7 @@ decl_event!(
 pub enum Ops<T: frame_system::Config> {
 	/// Input: account, token, amount, nonce
 	/// OutPut: new_account_amount,
-	Deposit(T::AccountId, TokenAddr, Amount, NonceId, Amount),
+	Deposit(T::AccountId, TokenAddr, Amount, NonceId, Amount, L1TxHash),
 	/// Input: account, l1account, token, amount, nonce
 	/// OutPut: new_account_amount
 	Withdraw(T::AccountId, L1Account, TokenAddr, Amount, NonceId, Amount),
@@ -64,6 +67,7 @@ decl_storage! {
 		pub AckMap get(fn ack_map): map hasher(blake2_128_concat) ReqId => u8;
 		pub ReqIndex get(fn req_index): ReqId;
 		pub NonceMap get(fn nonce_map): map hasher(blake2_128_concat) T::AccountId => NonceId;
+		pub DepositMap get(fn deposit_map): map hasher(blake2_128_concat) L1TxHash => u8;
 	}
 }
 
@@ -142,7 +146,8 @@ decl_module! {
 			account: T::AccountId,
 			token_address: TokenAddr,
 			amount: Amount,
-			nonce: NonceId
+			nonce: NonceId,
+			l1_tx_hash: U256
 		) -> dispatch::DispatchResult {
 			let _who = ensure_signed(origin)?;
 
@@ -151,11 +156,12 @@ decl_module! {
 
 			let _new_balance_amount = balance_add::<T>(&account, token_address, amount)?;
 
-			let op = Ops::Deposit(account.clone(), token_address, amount, nonce, _new_balance_amount.clone());
+			let op = Ops::Deposit(account.clone(), token_address, amount, nonce, _new_balance_amount.clone(), l1_tx_hash.clone());
 			PendingReqMap::<T>::insert(&_req_id, op);
 			BalanceMap::<T>::insert((&account, &token_address), _new_balance_amount);
 			ReqIndex::put(_req_id);
 			NonceMap::<T>::insert(&_who, _new_nonce);
+			DepositMap::insert(&l1_tx_hash, PENDING);
 			
 			Self::deposit_event(Event::<T>::Deposit(_req_id, account, token_address, amount, nonce, _new_balance_amount));
 			return Ok(());
@@ -385,7 +391,11 @@ decl_module! {
 			AckMap::insert(&req_id, &acks);
 
 			if acks == NACK {
-				PendingReqMap::<T>::get(&req_id).ok_or(Error::<T>::InvalidReqId)?;
+				let op = PendingReqMap::<T>::get(&req_id).ok_or(Error::<T>::InvalidReqId)?;
+				match op {
+					Ops::<T>::Deposit(_, _, _, _, _, l1_tx_hash) => DepositMap::insert(l1_tx_hash, DONE),
+					_ => {}
+				}
 				PendingReqMap::<T>::remove(&req_id);
 			}
 
