@@ -267,10 +267,12 @@ parameter_types! {
 }
 
 /// Configure the swap pallet in pallets/swap.
+
 impl pallet_swap::Config for Runtime {
 	type Event = Event;
 	type ADMIN1 = ADMIN1;
 	type ADMIN2 = ADMIN2;
+    type Currency = Balances;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.

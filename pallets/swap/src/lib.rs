@@ -2,6 +2,7 @@
 
 use frame_support::{decl_module, decl_storage, decl_event, decl_error, dispatch, traits::Get};
 use frame_system::ensure_signed;
+use frame_support::traits::{Currency, Imbalance, ReservableCurrency, OnUnbalanced};
 use codec::{ Encode, Decode };
 use sp_core::U256;
 
@@ -9,10 +10,15 @@ use sp_core::U256;
 mod mock;
 
 pub trait Config: frame_system::Config {
+    type Currency: Currency<Self::AccountId> + ReservableCurrency<Self::AccountId>;
+    //type Reward: OnUnbalanced<PositiveImbalanceOf<Self>>;
 	type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
 	type ADMIN1: Get<<Self as frame_system::Config>::AccountId>;
 	type ADMIN2: Get<<Self as frame_system::Config>::AccountId>;
 }
+
+type BalanceOf<T> = <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
+type PositiveImbalanceOf<T> = <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId,>>::PositiveImbalance;
 
 const ACK1: u8 = 1u8;
 const ACK2: u8 = 2u8;
@@ -28,7 +34,12 @@ type Amount = U256;
 type L1TxHash = U256;
 
 decl_event!(
-	pub enum Event<T> where AccountId = <T as frame_system::Config>::AccountId {
+	pub enum Event<T>
+    where
+        AccountId = <T as frame_system::Config>::AccountId,
+        Balance = BalanceOf<T>,
+        BlockNumber = <T as frame_system::Config>::BlockNumber,
+    {
 		Deposit(ReqId, AccountId, TokenAddr, Amount, NonceId, Amount),
 		WithdrawReq(ReqId, AccountId, L1Account, TokenAddr, Amount, NonceId, Amount),
 		SwapReq(ReqId, AccountId, TokenAddr, TokenAddr, Amount, NonceId, Amount, Amount, Amount, Amount),
@@ -36,6 +47,7 @@ decl_event!(
 		PoolRetrieveReq(ReqId, AccountId, TokenAddr, TokenAddr, Amount, Amount, NonceId, Amount, Amount, Amount, Amount, Amount),
 		Ack(ReqId, u8),
 		Abort(ReqId),
+        RewardFunds(AccountId, Balance, BlockNumber),
 	}
 );
 
@@ -140,6 +152,21 @@ decl_module! {
 		type Error = Error<T>;
 		fn deposit_event() = default;
 
+        /// Awards the specified amount of funds to the specified account
+        #[weight = 0]
+        pub fn charge(origin, account: T::AccountId, reward: BalanceOf<T>) {
+            let _ = ensure_signed(origin)?;
+
+            let mut total_imbalance = <PositiveImbalanceOf<T>>::zero();
+
+            let r = T::Currency::deposit_into_existing(&account, reward).ok();
+            total_imbalance.maybe_subsume(r);
+            //T::Reward::on_unbalanced(total_imbalance);
+
+            let now = <frame_system::Module<T>>::block_number();
+            Self::deposit_event(RawEvent::RewardFunds(account, reward, now));
+        }
+
 		#[weight = 10_000 + T::DbWeight::get().writes(1)]
 		pub fn deposit(
 			origin,
@@ -162,7 +189,6 @@ decl_module! {
 			ReqIndex::put(_req_id);
 			NonceMap::<T>::insert(&_who, _new_nonce);
 			DepositMap::insert(&l1_tx_hash, PENDING);
-			
 			Self::deposit_event(Event::<T>::Deposit(_req_id, account, token_address, amount, nonce, _new_balance_amount));
 			return Ok(());
 		}
@@ -277,13 +303,13 @@ decl_module! {
 				if token_from > token_to {
 					let (pool_balance_to, pool_balance_from) = PoolMap::get(_pool_index);
 					let new_pool_balance_from = pool_balance_from.checked_add(amount_from).ok_or(Error::<T>::PoolBalanceOverflow)?;
-					let new_pool_balance_to = pool_balance_to.checked_add(amount_to).ok_or(Error::<T>::PoolBalanceOverflow)?;			
+					let new_pool_balance_to = pool_balance_to.checked_add(amount_to).ok_or(Error::<T>::PoolBalanceOverflow)?;
 					PoolMap::insert(_pool_index, (new_pool_balance_to, new_pool_balance_from));
 					(new_pool_balance_to, new_pool_balance_from)
 				} else if token_from < token_to {
 					let (pool_balance_from, pool_balance_to) = PoolMap::get(_pool_index);
 					let new_pool_balance_from = pool_balance_from.checked_add(amount_from).ok_or(Error::<T>::PoolBalanceOverflow)?;
-					let new_pool_balance_to = pool_balance_to.checked_add(amount_to).ok_or(Error::<T>::PoolBalanceOverflow)?;			
+					let new_pool_balance_to = pool_balance_to.checked_add(amount_to).ok_or(Error::<T>::PoolBalanceOverflow)?;
 					PoolMap::insert(_pool_index, (new_pool_balance_from, new_pool_balance_to));
 					(new_pool_balance_from, new_pool_balance_to)
 				} else {
@@ -337,13 +363,13 @@ decl_module! {
 				if token_from > token_to {
 					let (pool_balance_to, pool_balance_from) = PoolMap::get(_pool_index);
 					let new_pool_balance_from = pool_balance_from.checked_sub(amount_from).ok_or(Error::<T>::PoolBalanceNotEnough)?;
-					let new_pool_balance_to = pool_balance_to.checked_sub(amount_to).ok_or(Error::<T>::PoolBalanceNotEnough)?;			
+					let new_pool_balance_to = pool_balance_to.checked_sub(amount_to).ok_or(Error::<T>::PoolBalanceNotEnough)?;
 					PoolMap::insert(_pool_index, (new_pool_balance_to, new_pool_balance_from));
 					(new_pool_balance_to, new_pool_balance_from)
 				} else if token_from < token_to {
 					let (pool_balance_from, pool_balance_to) = PoolMap::get(_pool_index);
 					let new_pool_balance_from = pool_balance_from.checked_sub(amount_from).ok_or(Error::<T>::PoolBalanceNotEnough)?;
-					let new_pool_balance_to = pool_balance_to.checked_sub(amount_to).ok_or(Error::<T>::PoolBalanceNotEnough)?;			
+					let new_pool_balance_to = pool_balance_to.checked_sub(amount_to).ok_or(Error::<T>::PoolBalanceNotEnough)?;
 					PoolMap::insert(_pool_index, (new_pool_balance_from, new_pool_balance_to));
 					(new_pool_balance_from, new_pool_balance_to)
 				} else {
@@ -402,5 +428,6 @@ decl_module! {
 			Self::deposit_event(RawEvent::Ack(req_id, acks));
 			return Ok(());
 		}
+
 	}
 }
