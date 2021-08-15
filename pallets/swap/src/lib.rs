@@ -1,6 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use frame_support::{decl_module, decl_storage, decl_event, decl_error, dispatch, traits::Get};
+use frame_support::traits::ExistenceRequirement;
 use frame_system::ensure_signed;
 use frame_support::traits::{Currency, Imbalance, ReservableCurrency, OnUnbalanced};
 use codec::{ Encode, Decode };
@@ -155,13 +156,14 @@ decl_module! {
         /// Awards the specified amount of funds to the specified account
         #[weight = 0]
         pub fn charge(origin, account: T::AccountId, reward: BalanceOf<T>) {
-            let _ = ensure_signed(origin)?;
+            let _who = ensure_signed(origin)?;
 
-            let mut total_imbalance = <PositiveImbalanceOf<T>>::zero();
-
-            let r = T::Currency::deposit_into_existing(&account, reward).ok();
-            total_imbalance.maybe_subsume(r);
+						let r = T::Currency::deposit_creating(&account, reward);
+            //let mut total_imbalance = <PositiveImbalanceOf<T>>::zero();
+            //total_imbalance.maybe_subsume(r);
             //T::Reward::on_unbalanced(total_imbalance);
+						//let _ = T::Currency::transfer(&_who, &account, reward, ExistenceRequirement::KeepAlive);
+
 
             let now = <frame_system::Module<T>>::block_number();
             Self::deposit_event(RawEvent::RewardFunds(account, reward, now));
