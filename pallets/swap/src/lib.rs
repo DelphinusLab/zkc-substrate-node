@@ -270,14 +270,11 @@ decl_module! {
         #[weight = 0]
         pub fn charge(origin, account: T::AccountId, reward: BalanceOf<T>) {
             let _who = ensure_signed(origin)?;
-
-                        let r = T::Currency::deposit_creating(&account, reward);
+            let r = T::Currency::deposit_creating(&account, reward);
             //let mut total_imbalance = <PositiveImbalanceOf<T>>::zero();
             //total_imbalance.maybe_subsume(r);
             //T::Reward::on_unbalanced(total_imbalance);
-                        //let _ = T::Currency::transfer(&_who, &account, reward, ExistenceRequirement::KeepAlive);
-
-
+						//let _ = T::Currency::transfer(&_who, &account, reward, ExistenceRequirement::KeepAlive);
             let now = <frame_system::Module<T>>::block_number();
             Self::deposit_event(RawEvent::RewardFunds(account, reward, now));
         }
