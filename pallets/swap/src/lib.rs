@@ -68,6 +68,7 @@ const DONE: u8 = 2u8;
 
 const MAX_ACCOUNT_COUNT: u32 = 1u32 << 20;
 const MAX_TOKEN_COUNT: u32 = 1u32 << 10;
+const START_TOKEN_COUNT: u32 = 4u32;
 const MAX_POOL_COUNT: u32 = 1u32 << 10;
 
 type TokenAddr = U256;
@@ -281,10 +282,15 @@ fn create_token_index<T: Config>(token: &TokenAddr) -> Result<TokenIndex, Error<
         return Err(Error::<T>::TokenExists);
     }
 
-    let index = TokenIndexCount::get();
+    let mut index = TokenIndexCount::get();
     if index >= MAX_TOKEN_COUNT {
         return Err(Error::<T>::TokenIndexOverflow);
     }
+
+    if index <= START_TOKEN_COUNT {
+        index = START_TOKEN_COUNT;
+    }
+
     TokenIndexCount::set(index + 1);
     TokenIndexMap::insert(token, index);
     return Ok(index);
