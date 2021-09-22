@@ -90,7 +90,17 @@ decl_event!(
         BlockNumber = <T as frame_system::Config>::BlockNumber,
     {
         Deposit(ReqId, AccountIndex, TokenIndex, Amount),
-        WithdrawReq(ReqId, AccountIndex, TokenIndex, Amount, L1Account, NonceId),
+        WithdrawReq(
+            ReqId,
+            U256,
+            U256,
+            U256,
+            AccountIndex,
+            TokenIndex,
+            Amount,
+            L1Account,
+            NonceId,
+        ),
         SwapReq(
             ReqId,
             U256,
@@ -98,8 +108,8 @@ decl_event!(
             U256,
             AccountIndex,
             PoolIndex,
-            u8,
             Amount,
+            u8,
             NonceId,
         ),
         PoolSupplyReq(
@@ -137,7 +147,16 @@ pub enum Ops {
     /// Input: account, token, amount, nonce
     Deposit(AccountIndex, TokenIndex, Amount),
     /// Input: account, l1account, token, amount, nonce
-    Withdraw(AccountIndex, TokenIndex, Amount, L1Account, NonceId),
+    Withdraw(
+        U256,
+        U256,
+        U256,
+        AccountIndex,
+        TokenIndex,
+        Amount,
+        L1Account,
+        NonceId,
+    ),
     /// Input: account, pool, direction, amount, nonce
     Swap(
         U256,
@@ -145,8 +164,8 @@ pub enum Ops {
         U256,
         AccountIndex,
         PoolIndex,
-        u8,
         Amount,
+        u8,
         NonceId,
     ),
     /// Input: account, pool, amount0, amount1, nonce
@@ -525,14 +544,20 @@ decl_module! {
             let _new_nonce = nonce_check::<T>(&account, nonce)?;
             let _new_balance = balance_sub::<T>(&_account_index, &_token_index, amount)?;
 
-            let op = Ops::Withdraw(_account_index, _token_index, amount, l1account, nonce);
+            let op = Ops::Withdraw(
+                U256::from(0), U256::from(0), U256::from(0),
+                _account_index, _token_index, amount, l1account, nonce);
             PendingReqMap::insert(&_req_id, op);
             ReqIndex::put(_req_id);
 
             balance_set(&_account_index, &_token_index, _new_balance);
             NonceMap::<T>::insert(&account, _new_nonce);
 
-            Self::deposit_event(Event::<T>::WithdrawReq(_req_id, _account_index, _token_index, amount, l1account, nonce));
+            Self::deposit_event(Event::<T>::WithdrawReq(
+                _req_id,
+                U256::from(0), U256::from(0), U256::from(0),
+                _account_index, _token_index, amount, l1account, nonce
+            ));
 
             return Ok(());
         }
@@ -550,9 +575,9 @@ decl_module! {
             let _account_index = get_account_index::<T>(&account)?;
             let _token_from_index = get_token_index::<T>(&token_from)?;
             let _token_to_index = get_token_index::<T>(&token_to)?;
-            let _direction = _token_from_index < _token_to_index;
+            let _direction =  if _token_from_index < _token_to_index { 0u8 } else { 1u8 };
             let _pool_index =
-                if _direction {
+                if _direction == 0 {
                     get_pool_index::<T>(&_token_from_index, &_token_to_index)?
                 } else {
                     get_pool_index::<T>(&_token_to_index, &_token_from_index)?
@@ -566,9 +591,9 @@ decl_module! {
             let _new_balance_to = balance_add::<T>(&_account_index, &_token_to_index, amount)?;
 
             // for pool
-            pool_change::<T>(&_pool_index, _direction, amount, !_direction, amount)?;
+            pool_change::<T>(&_pool_index, _direction == 0, amount, _direction != 0, amount)?;
 
-            let op = Ops::Swap(U256::from(0), U256::from(0), U256::from(0), _account_index, _pool_index, if _direction { 1u8 } else { 0u8 }, amount, nonce);
+            let op = Ops::Swap(U256::from(0), U256::from(0), U256::from(0), _account_index, _pool_index, amount, _direction, nonce);
 
             PendingReqMap::insert(&_req_id, op);
             ReqIndex::put(_req_id);
@@ -579,7 +604,7 @@ decl_module! {
 
             Self::deposit_event(
                 Event::<T>::SwapReq(
-                    _req_id, U256::from(0), U256::from(0), U256::from(0), _account_index, _pool_index, if _direction { 1u8 } else { 0u8 }, amount, nonce
+                    _req_id, U256::from(0), U256::from(0), U256::from(0), _account_index, _pool_index, amount, _direction, nonce
                 )
             );
 
