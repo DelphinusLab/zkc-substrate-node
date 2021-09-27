@@ -497,14 +497,13 @@ decl_module! {
         pub fn deposit(
             origin,
             account: T::AccountId,
-            token_address: TokenAddr,
+            token_index: TokenIndex,
             amount: Amount,
             nonce: NonceId,
             l1_tx_hash: U256
         ) -> dispatch::DispatchResult {
             let _who = ensure_signed(origin)?;
             let _account_index = get_or_create_account_index::<T>(&account)?;
-            let _token_index = get_token_index::<T>(&token_address)?;
 
             if L1TxMap::get(l1_tx_hash) != 0u8 {
                 return Err(Error::<T>::L1TXExists)?;
@@ -513,17 +512,17 @@ decl_module! {
             let _new_nonce = nonce_check::<T>(&_who, nonce)?;
             let _req_id = req_id_get::<T>()?;
 
-            let _new_balance_amount = balance_add::<T>(&_account_index, &_token_index, amount)?;
-            let op = Ops::Deposit(_account_index, _token_index, amount);
+            let _new_balance_amount = balance_add::<T>(&_account_index, &token_index, amount)?;
+            let op = Ops::Deposit(_account_index, token_index, amount);
 
-            balance_set(&_account_index, &_token_index, _new_balance_amount);
+            balance_set(&_account_index, &token_index, _new_balance_amount);
             PendingReqMap::insert(&_req_id, op);
             ReqIndex::put(_req_id);
             NonceMap::<T>::insert(&_who, _new_nonce);
             DepositMap::insert(&_req_id, l1_tx_hash);
             L1TxMap::insert(&l1_tx_hash, PENDING);
 
-            Self::deposit_event(Event::<T>::Deposit(_req_id, _account_index, _token_index, amount));
+            Self::deposit_event(Event::<T>::Deposit(_req_id, _account_index, token_index, amount));
             return Ok(());
         }
 
@@ -532,31 +531,30 @@ decl_module! {
             origin,
             account: T::AccountId,
             l1account: L1Account,
-            token_address: TokenAddr,
+            token_index: TokenIndex,
             amount: Amount,
             nonce: NonceId
         ) -> dispatch::DispatchResult {
             let _who = ensure_signed(origin)?;
             let _account_index = get_account_index::<T>(&account)?;
-            let _token_index = get_token_index::<T>(&token_address)?;
 
             let _req_id = req_id_get::<T>()?;
             let _new_nonce = nonce_check::<T>(&account, nonce)?;
-            let _new_balance = balance_sub::<T>(&_account_index, &_token_index, amount)?;
+            let _new_balance = balance_sub::<T>(&_account_index, &token_index, amount)?;
 
             let op = Ops::Withdraw(
                 U256::from(0), U256::from(0), U256::from(0),
-                _account_index, _token_index, amount, l1account, nonce);
+                _account_index, token_index, amount, l1account, nonce);
             PendingReqMap::insert(&_req_id, op);
             ReqIndex::put(_req_id);
 
-            balance_set(&_account_index, &_token_index, _new_balance);
+            balance_set(&_account_index, &token_index, _new_balance);
             NonceMap::<T>::insert(&account, _new_nonce);
 
             Self::deposit_event(Event::<T>::WithdrawReq(
                 _req_id,
                 U256::from(0), U256::from(0), U256::from(0),
-                _account_index, _token_index, amount, l1account, nonce
+                _account_index, token_index, amount, l1account, nonce
             ));
 
             return Ok(());
