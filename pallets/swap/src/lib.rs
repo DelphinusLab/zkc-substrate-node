@@ -203,9 +203,6 @@ decl_storage! {
         pub AccountIndexCount: AccountIndex;
         pub AccountIndexMap get(fn account_index_map): map hasher(blake2_128_concat) T::AccountId => Option<AccountIndex>;
 
-        pub TokenIndexCount: TokenIndex;
-        pub TokenIndexMap get(fn token_index_map): map hasher(blake2_128_concat) TokenAddr => Option<TokenIndex>;
-
         pub PoolIndexCount: PoolIndex;
         pub PoolIndexMap get(fn pool_index_map): map hasher(blake2_128_concat) (TokenIndex, TokenIndex) => Option<PoolIndex>;
 
@@ -262,31 +259,6 @@ fn get_or_create_account_index<T: Config>(
         None => create_account_index(account),
         Some(account_index) => Ok(account_index),
     };
-}
-
-/* ---- Token Index ---- */
-fn get_token_index<T: Config>(token: &TokenAddr) -> Result<TokenIndex, Error<T>> {
-    let token_index = TokenIndexMap::get(&token).ok_or(Error::<T>::TokenNotExists)?;
-    return Ok(token_index);
-}
-
-fn create_token_index<T: Config>(token: &TokenAddr) -> Result<TokenIndex, Error<T>> {
-    if get_token_index::<T>(token).is_ok() {
-        return Err(Error::<T>::TokenExists);
-    }
-
-    let mut index = TokenIndexCount::get();
-    if index >= MAX_TOKEN_COUNT {
-        return Err(Error::<T>::TokenIndexOverflow);
-    }
-
-    if index <= START_TOKEN_COUNT {
-        index = START_TOKEN_COUNT;
-    }
-
-    TokenIndexCount::set(index + 1);
-    TokenIndexMap::insert(token, index);
-    return Ok(index);
 }
 
 /* ---- Pool Index ---- */
@@ -434,27 +406,6 @@ decl_module! {
         }
 
         #[weight = 10_000 + T::DbWeight::get().writes(1)]
-        pub fn add_token(
-            origin,
-            token_address: TokenAddr
-        ) -> dispatch::DispatchResult {
-            let _who = ensure_signed(origin)?;
-            let _ = is_admin::<T>(&_who)?;
-
-            //let _new_nonce = nonce_check::<T>(&_who, nonce)?;
-            //let _req_id = req_id_get::<T>()?;
-            let _token_index = create_token_index::<T>(&token_address)?;
-            //let op = Ops::AddToken(token_address, _token_index);
-
-            //PendingReqMap::insert(&_req_id, op);
-            //ReqIndex::put(_req_id);
-            //NonceMap::<T>::insert(&_who, _new_nonce);
-
-            //Self::deposit_event(Event::<T>::AddTokenReq(_req_id, token_address, _token_index));
-            return Ok(());
-        }
-
-        #[weight = 10_000 + T::DbWeight::get().writes(1)]
         pub fn add_pool(
             origin,
             token_index_0: TokenIndex,
@@ -467,7 +418,11 @@ decl_module! {
             let _new_nonce = nonce_check::<T>(&_who, nonce)?;
             let _req_id = req_id_get::<T>()?;
 
-            if token_index_0 >= TokenIndexCount::get() || token_index_0 >= TokenIndexCount::get() {
+            if token_index_0 >= MAX_TOKEN_COUNT || token_index_0 < START_TOKEN_COUNT {
+                return Err(Error::<T>::InvalidTokenIndex)?;
+            }
+
+            if token_index_1 >= MAX_TOKEN_COUNT || token_index_1 < START_TOKEN_COUNT {
                 return Err(Error::<T>::InvalidTokenIndex)?;
             }
 
@@ -564,15 +519,15 @@ decl_module! {
         pub fn swap(
             origin,
             account: T::AccountId,
-            token_from: TokenAddr,
-            token_to: TokenAddr,
+            token_from: TokenIndex,
+            token_to: TokenIndex,
             amount: Amount,
             nonce: NonceId
         ) -> dispatch::DispatchResult {
             let _who = ensure_signed(origin)?;
             let _account_index = get_account_index::<T>(&account)?;
-            let _token_from_index = get_token_index::<T>(&token_from)?;
-            let _token_to_index = get_token_index::<T>(&token_to)?;
+            let _token_from_index = token_from;
+            let _token_to_index = token_to;
             let _direction =  if _token_from_index < _token_to_index { 0u8 } else { 1u8 };
             let _pool_index =
                 if _direction == 0 {
@@ -613,16 +568,16 @@ decl_module! {
         pub fn pool_supply(
             origin,
             account: T::AccountId,
-            token_from: TokenAddr,
-            token_to: TokenAddr,
+            token_from: TokenIndex,
+            token_to: TokenIndex,
             amount_from: Amount,
             amount_to: Amount,
             nonce: NonceId
         ) -> dispatch::DispatchResult {
             let _who = ensure_signed(origin)?;
             let _account_index = get_account_index::<T>(&account)?;
-            let __token_from_index = get_token_index::<T>(&token_from)?;
-            let __token_to_index = get_token_index::<T>(&token_to)?;
+            let __token_from_index = token_from;
+            let __token_to_index = token_to;
             let (_token_from_index, _token_from_amount, _token_to_index, _token_to_amount) =
                 if __token_from_index < __token_to_index {
                     (__token_from_index, amount_from, __token_to_index, amount_to)
@@ -670,16 +625,16 @@ decl_module! {
         pub fn pool_retrieve(
             origin,
             account: T::AccountId,
-            token_from: TokenAddr,
-            token_to: TokenAddr,
+            token_from: TokenIndex,
+            token_to: TokenIndex,
             amount_from: Amount,
             amount_to: Amount,
             nonce: NonceId
         ) -> dispatch::DispatchResult {
             let _who = ensure_signed(origin)?;
             let _account_index = get_account_index::<T>(&account)?;
-            let __token_from_index = get_token_index::<T>(&token_from)?;
-            let __token_to_index = get_token_index::<T>(&token_to)?;
+            let __token_from_index = token_from;
+            let __token_to_index = token_to;
             let (_token_from_index, _token_from_amount, _token_to_index, _token_to_amount) =
                 if __token_from_index < __token_to_index {
                     (__token_from_index, amount_from, __token_to_index, amount_to)
@@ -741,8 +696,13 @@ decl_module! {
             AckMap::insert(&req_id, &acks);
 
             if acks == NACK {
-                let l1txhash = DepositMap::get(&req_id).ok_or(Error::<T>::InvalidReqId)?;
-                L1TxMap::insert(l1txhash, DONE);
+                let l1txhash = DepositMap::get(&req_id);
+                match l1txhash {
+                    None => {},
+                    Some(v) => {
+                        L1TxMap::insert(v, DONE);
+                    }
+                };
                 PendingReqMap::remove(&req_id);
             }
 
