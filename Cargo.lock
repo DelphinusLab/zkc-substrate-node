@@ -1181,6 +1181,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "delphinus-crypto"
+version = "0.1.0"
+dependencies = [
+ "getrandom 0.2.3",
+ "lazy_static",
+ "num-bigint 0.4.3",
+ "num-integer",
+ "num-traits",
+ "rustc-hex 1.0.0",
+ "sha2 0.9.5",
+ "sp-std",
+]
+
+[[package]]
 name = "derive_more"
 version = "0.99.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1467,7 +1481,7 @@ checksum = "cfcf0ed7fe52a17a03854ec54a9f76d6d84508d1c0e66bc1793301c73fc8493c"
 dependencies = [
  "byteorder",
  "rand 0.8.4",
- "rustc-hex",
+ "rustc-hex 2.1.0",
  "static_assertions",
 ]
 
@@ -1952,8 +1966,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7fcd999463524c52659517fe2cea98493cfe485d10565e7b0fb07dbba7ad2753"
 dependencies = [
  "cfg-if 1.0.0",
+ "js-sys",
  "libc",
  "wasi 0.10.0+wasi-snapshot-preview1",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -2676,6 +2692,9 @@ name = "lazy_static"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
+dependencies = [
+ "spin",
+]
 
 [[package]]
 name = "lazycell"
@@ -3664,6 +3683,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "num-bigint"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f93ab6289c7b344a8a9f60f88d80aa20032336fe78da341afc91c8a2341fc75f"
+dependencies = [
+ "autocfg",
+ "num-integer",
+ "num-traits",
+ "rand 0.8.4",
+]
+
+[[package]]
 name = "num-complex"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3689,7 +3720,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5c000134b5dbf44adc5cb772486d335293351644b801551abe8f75c84cfa4aef"
 dependencies = [
  "autocfg",
- "num-bigint",
+ "num-bigint 0.2.6",
  "num-integer",
  "num-traits",
 ]
@@ -3904,10 +3935,12 @@ dependencies = [
 
 [[package]]
 name = "pallet-swap"
-version = "3.0.0"
+version = "1.0.0"
 dependencies = [
+ "delphinus-crypto",
  "frame-support",
  "frame-system",
+ "num-bigint 0.4.3",
  "parity-scale-codec",
  "serde",
  "sha2 0.9.5",
@@ -4968,6 +5001,12 @@ checksum = "08d43f7aa6b08d49f382cde6a7982047c3426db949b1424bc4b7ec9ae12c6ce2"
 
 [[package]]
 name = "rustc-hex"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ceb8ce7a5e520de349e1fa172baeba4a9e8d5ef06c47471863530bc4972ee1e"
+
+[[package]]
+name = "rustc-hex"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3e75f6a532d0fd9f7f13144f392b6ad56a32696bfcd9c78f797f16bbb6f072d6"
@@ -5310,7 +5349,7 @@ dependencies = [
  "futures-timer 3.0.2",
  "log",
  "merlin",
- "num-bigint",
+ "num-bigint 0.2.6",
  "num-rational 0.2.4",
  "num-traits",
  "parity-scale-codec",
@@ -7722,7 +7761,7 @@ dependencies = [
  "hash-db",
  "hashbrown 0.11.2",
  "log",
- "rustc-hex",
+ "rustc-hex 2.1.0",
  "smallvec 1.6.1",
 ]
 
