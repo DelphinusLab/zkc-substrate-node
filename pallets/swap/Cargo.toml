@@ -23,7 +23,7 @@ frame-support = { default-features = false, version = '3.0.0' }
 frame-system = { default-features = false, version = '3.0.0' }
 sp-core = { default-features = false, version = '3.0.0' }
 sha2 = { default-features = false, version = '0.9.5' }
-delphinus-crypto = { path = '../../../delphinus-lerna/packages/delphinus-crypto-rust/substrate', default-features = false }
+delphinus-crypto = { path = '../../../crypto-rust/substrate', default-features = false }
 num-bigint = { version = "0.4", features = ["rand"], default-features = false }
 
 [dev-dependencies]
