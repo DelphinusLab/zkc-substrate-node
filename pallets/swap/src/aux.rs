@@ -111,7 +111,7 @@ pub fn pool_change<T: Config>(
     is_add_1: bool,
     change_1: Amount,
 ) -> Result<(Amount, Amount), Error<T>> {
-    let (token_index_0, token_index_1, amount_0, amount_1) = PoolMap::get(pool_index);
+    let (token_index_0, token_index_1, amount_0, amount_1) = PoolMap::get(pool_index).ok_or(Error::<T>::PoolNotExists)?;
     let new_amount_0 = if is_add_0 {
         amount_0
             .checked_add(change_0)
