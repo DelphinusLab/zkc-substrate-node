@@ -53,6 +53,7 @@ decl_event!(
     where
         Balance = BalanceOf<T>,
         BlockNumber = <T as frame_system::Config>::BlockNumber,
+        AccountId = <T as frame_system::Config>::AccountId
     {
         SetKey(ReqId, AccountIndex, PublicKey),
         Deposit(ReqId, Signature, AccountIndex, TokenIndex, Amount),
@@ -94,7 +95,7 @@ decl_event!(
         ),
         Ack(ReqId, u8),
         Abort(ReqId),
-        RewardFunds(AccountIndex, Balance, BlockNumber),
+        RewardFunds(AccountId, Balance, BlockNumber),
         AddPoolReq(ReqId, Signature, PoolIndex, TokenIndex, TokenIndex),
     }
 );
@@ -131,11 +132,10 @@ decl_module! {
         /// Awards the specified amount of funds to the specified account
         #[weight = 0]
         pub fn charge(origin, account: T::AccountId, reward: BalanceOf<T>) {
-            let _who = ensure_signed(origin)?;
-            let account_index = get_account_index::<T>(&account)?;
+            let who = ensure_signed(origin)?;
             let _r = T::Currency::deposit_creating(&account, reward);
             let now = <frame_system::Module<T>>::block_number();
-            Self::deposit_event(RawEvent::RewardFunds(account_index, reward, now));
+            Self::deposit_event(RawEvent::RewardFunds(who, reward, now));
             return Ok(());
         }
 
