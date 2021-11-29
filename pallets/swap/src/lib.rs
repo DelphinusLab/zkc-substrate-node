@@ -53,50 +53,89 @@ decl_event!(
     where
         Balance = BalanceOf<T>,
         BlockNumber = <T as frame_system::Config>::BlockNumber,
-        AccountId = <T as frame_system::Config>::AccountId
+        AccountId = <T as frame_system::Config>::AccountId,
     {
-        SetKey(ReqId, AccountIndex, PublicKey),
-        Deposit(ReqId, Signature, AccountIndex, TokenIndex, Amount),
-        WithdrawReq(
+        SetKey(
             ReqId,
-            Signature,
+            SignatureRX,
+            SignatureRY,
+            SignatureS,
+            NonceId,
+            AccountIndex,
+            ReserveU32,
+            PublicKeyX,
+            PublicKeyY,
+        ),
+        Deposit(
+            ReqId,
+            SignatureRX,
+            SignatureRY,
+            SignatureS,
+            NonceId,
+            AccountIndex,
+            TokenIndex,
+            Amount,
+            ReserveU256,
+        ),
+        Withdraw(
+            ReqId,
+            SignatureRX,
+            SignatureRY,
+            SignatureS,
+            NonceId,
             AccountIndex,
             TokenIndex,
             Amount,
             L1Account,
-            NonceId,
         ),
-        SwapReq(
+        Swap(
             ReqId,
-            Signature,
+            SignatureRX,
+            SignatureRY,
+            SignatureS,
+            NonceId,
             AccountIndex,
             PoolIndex,
+            Reverse,
             Amount,
-            Direction,
-            NonceId,
         ),
-        PoolSupplyReq(
+        PoolSupply(
             ReqId,
-            Signature,
-            AccountIndex,
-            PoolIndex,
-            Amount,
-            Amount,
+            SignatureRX,
+            SignatureRY,
+            SignatureS,
             NonceId,
-        ),
-        PoolRetrieveReq(
-            ReqId,
-            Signature,
             AccountIndex,
             PoolIndex,
             Amount,
             Amount,
+        ),
+        PoolRetrieve(
+            ReqId,
+            SignatureRX,
+            SignatureRY,
+            SignatureS,
             NonceId,
+            AccountIndex,
+            PoolIndex,
+            Amount,
+            Amount,
+        ),
+        AddPool(
+            ReqId,
+            SignatureRX,
+            SignatureRY,
+            SignatureS,
+            NonceId,
+            TokenIndex,
+            TokenIndex,
+            ReserveU256,
+            ReserveU256,
+            PoolIndex,
         ),
         Ack(ReqId, u8),
         Abort(ReqId),
         RewardFunds(AccountId, Balance, BlockNumber),
-        AddPoolReq(ReqId, Signature, PoolIndex, TokenIndex, TokenIndex),
     }
 );
 
@@ -141,7 +180,7 @@ decl_module! {
 
         #[weight = 0]
         pub fn set_key(origin, key: [u8; 32]) -> dispatch::DispatchResult {
-            let _who = ensure_signed(origin)?;
+            let who = ensure_signed(origin)?;
 
             let key = BabyJubjubPoint::decode(&key).map_err(|_| Error::<T>::InvalidKey)?;
 
@@ -149,12 +188,18 @@ decl_module! {
             let y = u256_from_bigint(&key.y.v);
 
             let req_id = req_id_get::<T>()?;
-            let account_index = create_account_index::<T>(&_who)?;
+            let account_index = create_account_index::<T>(&who)?;
+            let nonce = NonceMap::<T>::get(&who);
+            let new_nonce = nonce_check::<T>(&who, nonce)?;
 
+            let op = Ops::SetKey(U256::from(0), U256::from(0), U256::from(0), nonce, account_index, 0u32, x, y);
+
+            PendingReqMap::insert(&req_id, op);
             KeyMap::insert(account_index, (x, y));
             ReqIndex::put(req_id);
+            NonceMap::<T>::insert(&who, new_nonce);
 
-            Self::deposit_event(RawEvent::SetKey(req_id, account_index, (x, y)));
+            Self::deposit_event(RawEvent::SetKey(req_id, U256::from(0), U256::from(0), U256::from(0), nonce, account_index, 0u32, x, y));
             return Ok(());
         }
 
@@ -202,13 +247,16 @@ decl_module! {
                 };
 
             let pool_index = create_pool_index::<T>(&_token_index_0, &_token_index_1)?;
-            let op = Ops::AddPool(sign, pool_index, token_index_0, token_index_1);
+            let op = Ops::AddPool(sign.0, sign.1, sign.2, nonce, token_index_0, token_index_1, U256::from(0), U256::from(0), pool_index);
 
             PendingReqMap::insert(&req_id, op);
             ReqIndex::put(req_id);
             NonceMap::<T>::insert(&who, new_nonce);
 
-            Self::deposit_event(Event::<T>::AddPoolReq(req_id, sign, pool_index, token_index_0, token_index_1));
+            Self::deposit_event(Event::<T>::AddPool(
+                req_id, sign.0, sign.1, sign.2, nonce,
+                token_index_0, token_index_1, U256::from(0), U256::from(0), pool_index
+            ));
             return Ok(());
         }
 
@@ -223,6 +271,8 @@ decl_module! {
             nonce: NonceId
         ) -> dispatch::DispatchResult {
             let who = ensure_signed(origin)?;
+            is_admin::<T>(&who)?;
+
             let who_account_index = get_account_index::<T>(&who)?;
 
             if token_index >= AccountIndexCount::get() {
@@ -251,7 +301,8 @@ decl_module! {
             let req_id = req_id_get::<T>()?;
 
             let new_balance_amount = balance_add::<T>(&account_index, &token_index, amount)?;
-            let op = Ops::Deposit(sign, account_index, token_index, amount);
+
+            let op = Ops::Deposit(sign.0, sign.1, sign.2, nonce, account_index, token_index, amount, U256::from(0));
 
             balance_set(&account_index, &token_index, new_balance_amount);
             PendingReqMap::insert(&req_id, op);
@@ -260,7 +311,7 @@ decl_module! {
             DepositMap::insert(&req_id, l1_tx_hash);
             L1TxMap::insert(&l1_tx_hash, PENDING);
 
-            Self::deposit_event(Event::<T>::Deposit(req_id, sign, account_index, token_index, amount));
+            Self::deposit_event(Event::<T>::Deposit(req_id, sign.0, sign.1, sign.2, nonce, account_index, token_index, amount, U256::from(0)));
             return Ok(());
         }
 
@@ -290,17 +341,16 @@ decl_module! {
             command[49..81].copy_from_slice(&l1account.to_le_bytes());
             let sign = check_sign::<T>(account_index, &command, &sign)?;
 
-            let op = Ops::Withdraw(sign, account_index, token_index, amount, l1account, nonce);
+            let op = Ops::Withdraw(sign.0, sign.1, sign.2, nonce, account_index, token_index, amount, l1account);
             PendingReqMap::insert(&req_id, op);
             ReqIndex::put(req_id);
 
             balance_set(&account_index, &token_index, new_balance);
             NonceMap::<T>::insert(&account, new_nonce);
 
-            Self::deposit_event(Event::<T>::WithdrawReq(
+            Self::deposit_event(Event::<T>::Withdraw(
                 req_id,
-                sign,
-                account_index, token_index, amount, l1account, nonce
+                sign.0, sign.1, sign.2, nonce, account_index, token_index, amount, l1account
             ));
 
             return Ok(());
@@ -311,7 +361,7 @@ decl_module! {
             origin,
             sign: [u8; 64],
             pool_index: PoolIndex,
-            reverse: Direction,
+            reverse: Reverse,
             amount: Amount,
             nonce: NonceId
         ) -> dispatch::DispatchResult {
@@ -339,7 +389,7 @@ decl_module! {
 
             pool_change::<T>(&pool_index, reverse == 0, amount, reverse != 0, amount)?;
 
-            let op = Ops::Swap(sign, account_index, pool_index, amount, reverse, nonce);
+            let op = Ops::Swap(sign.0, sign.1, sign.2, nonce, account_index, pool_index, reverse, amount);
 
             PendingReqMap::insert(&req_id, op);
             ReqIndex::put(req_id);
@@ -349,8 +399,9 @@ decl_module! {
             NonceMap::<T>::insert(&account, new_nonce);
 
             Self::deposit_event(
-                Event::<T>::SwapReq(
-                    req_id, sign, account_index, pool_index, amount, reverse, nonce
+                Event::<T>::Swap(
+                    req_id,
+                    sign.0, sign.1, sign.2, nonce, account_index, pool_index, reverse, amount
                 )
             );
 
@@ -390,11 +441,7 @@ decl_module! {
 
             pool_change::<T>(&pool_index, true, amount0, true, amount1)?;
 
-            let op = Ops::PoolSupply(
-                sign,
-                account_index, pool_index, amount0, amount1, nonce
-            );
-
+            let op = Ops::PoolSupply(sign.0, sign.1, sign.2, nonce, account_index, pool_index, amount0, amount1);
             PendingReqMap::insert(&req_id, op);
             ReqIndex::put(req_id);
 
@@ -404,9 +451,8 @@ decl_module! {
             NonceMap::<T>::insert(&account, new_nonce);
 
             Self::deposit_event(
-                Event::<T>::PoolSupplyReq(
-                    req_id, sign, account_index, pool_index, amount0, amount1, nonce
-                )
+                Event::<T>::PoolSupply(
+                    req_id, sign.0, sign.1, sign.2, nonce, account_index, pool_index, amount0, amount1)
             );
 
             return Ok(());
@@ -447,9 +493,7 @@ decl_module! {
             // for pool
             pool_change::<T>(&pool_index, false, amount0, false, amount1)?;
 
-            let op = Ops::PoolRetrieve(
-                sign,
-                account_index, pool_index, amount0, amount1, nonce);
+            let op = Ops::PoolRetrieve(sign.0, sign.1, sign.2, nonce, account_index, pool_index, amount0, amount1);
 
             PendingReqMap::insert(&req_id, op);
             ReqIndex::put(req_id);
@@ -460,8 +504,8 @@ decl_module! {
             NonceMap::<T>::insert(&account, new_nonce);
 
             Self::deposit_event(
-                Event::<T>::PoolRetrieveReq(
-                    req_id, sign, account_index, pool_index, amount0, amount1, nonce,
+                Event::<T>::PoolRetrieve(
+                    req_id, sign.0, sign.1, sign.2, nonce, account_index, pool_index, amount0, amount1
                 )
             );
 
