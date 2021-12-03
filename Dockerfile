@@ -23,5 +23,5 @@ RUN useradd -m -u 1000 -U -s /bin/sh -d /zhenxunge zhenxunge && \
 USER zhenxunge
 EXPOSE 30333 9933 9944 9615
 VOLUME ["/data"]
-ENTRYPOINT "/usr/local/bin/node-swap"
+ENTRYPOINT ["/usr/local/bin/node-swap"]
 CMD ["--dev", "--ws-external"]

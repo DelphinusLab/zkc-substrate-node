@@ -2,6 +2,7 @@ version: "3.9"
 services:
   node-alice:
     image: zhenxunge-node
+    command: ["--alice", "--dev", "--ws-external"]
     networks:
       - zhenxunge-node
     ports:
@@ -15,6 +16,7 @@ services:
 
   node-bob:
     image: zhenxunge-node
+    command: ["--bob", "--dev", "--ws-external"]
     networks:
       - zhenxunge-node
     ports:
@@ -28,6 +30,7 @@ services:
 
   node-charlie:
     image: zhenxunge-node
+    command: ["--charlie", "--dev", "--ws-external"]
     networks:
       - zhenxunge-node
     ports:
