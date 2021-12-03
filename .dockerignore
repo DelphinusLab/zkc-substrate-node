@@ -5,10 +5,12 @@
 
 # Github
 .github
+/deploy/
 
 # Docker
 Dockerfile
 docker-compose.yml
+docker-compose.dev.yml
 .dockerignore
 
 # Documentation
