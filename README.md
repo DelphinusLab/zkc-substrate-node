@@ -9,9 +9,11 @@ We use [buildkit](https://docs.docker.com/develop/develop-images/build_enhanceme
 
 Running the following to deploy a node on remote host `remote-host`.
 ```
-./deploy/deploy.sh -m ubuntu@remote-host
+./deploy/deploy.sh -m ubuntu@remote-host -d test.example.com
 ```
 
+The RPC server can be accessed via `wss://test.example.com`, if `test.example.com` is pointed to `remote-host`.
+The TLS certificate is obtained automatically with [caddy](https://caddyserver.com/).
 Run `./deploy/deploy.sh -h` for more options.
 
 ## Running a smallish network for development

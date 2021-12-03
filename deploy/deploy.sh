@@ -14,10 +14,9 @@ function usage() {
   cat <<EOF
 deploy.sh deploy node to remote or local machine
 Options
--m MACHINE             deploy to this machine
--d DOMAIN              domain to use for this node
--r REPO                repo path (default: grandparent directory of this file)
--k PRIVATE_KEY_FILE    set the private key to use
+-m MACHINE             deploy to this machine, if not set, deploy locally
+-d DOMAIN              domain to use for rpc service, required for tls certificate
+-r REPO                repo path (default: grandparent directory of this script)
 -h                     show usage
 -l                     follow logs only
 -v                     increase verbosity
@@ -25,7 +24,7 @@ Options
 EOF
 }
 
-while getopts "m:d:r:k:hlvn-" opt; do
+while getopts "m:d:r:hlvn-" opt; do
   case $opt in
   m)
     machine="$OPTARG"
@@ -35,9 +34,6 @@ while getopts "m:d:r:k:hlvn-" opt; do
     ;;
   r)
     repo="$OPTARG"
-    ;;
-  k)
-    private_key_file="$OPTARG"
     ;;
   h)
     usage
