@@ -16,6 +16,7 @@ services:
 
   node:
     labels:
+      caddy: ${NODE_DOMAIN:-localhost}
       caddy.reverse_proxy: "{{upstreams 9944}}"
     image: zhenxunge-node
     networks:
@@ -28,6 +29,7 @@ services:
 
 networks:
   caddy:
+    external: true
 
 volumes:
   zhenxunge-node-data:

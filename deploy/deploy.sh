@@ -2,9 +2,10 @@
 set -ueo pipefail
 
 local_repo_path="$(cd "$(dirname "$(dirname "${BASH_SOURCE[0]}")")" && pwd)"
-machine="${DEPLOY_MACHINE:-}"
-repo="${DEPLOY_REPO:-$local_repo_path}"
-private_key_file="${DEPLOY_PRIVATE_KEY_FILE:-}"
+machine=
+domain=
+repo="$local_repo_path"
+private_key_file=
 dry_run=
 verbose=
 logs_only=
@@ -14,19 +15,23 @@ function usage() {
 deploy.sh deploy node to remote or local machine
 Options
 -m MACHINE             deploy to this machine
+-d DOMAIN              domain to use for this node
 -r REPO                repo path (default: grandparent directory of this file)
 -k PRIVATE_KEY_FILE    set the private key to use
 -h                     show usage
 -l                     follow logs only
 -v                     increase verbosity
--d, -n                 dry run
+-d                     dry run
 EOF
 }
 
-while getopts "m:r:k:hlvdn-" opt; do
+while getopts "m:d:r:k:hlvn-" opt; do
   case $opt in
   m)
     machine="$OPTARG"
+    ;;
+  d)
+    domain="$OPTARG"
     ;;
   r)
     repo="$OPTARG"
@@ -44,7 +49,7 @@ while getopts "m:r:k:hlvdn-" opt; do
   v)
     verbose=
     ;;
-  d | n)
+  n)
     dry_run=y
     ;;
   -)
@@ -99,7 +104,11 @@ function copy_repo() {
 
 function start_node() {
   run_maybe_remote_command env DOCKER_BUILDKIT=1 docker build "$repo_path" -t zhenxunge-node
-  run_maybe_remote_command docker-compose -f "$repo_path/docker-compose.yml" up -d
+  env=()
+  if [[ -n "$domain" ]]; then
+    env+=(NODE_DOMAIN="$domain")
+  fi
+  run_maybe_remote_command env "${env[@]}" docker-compose -f "$repo_path/docker-compose.yml" up -d
 }
 
 function follow_node_logs() {
@@ -118,6 +127,7 @@ function sanity_check() {
     exit 1
   fi
   run_maybe_remote_command mkdir -p "$repo_name"
+  run_maybe_remote_command bash -c "docker network inspect caddy || docker network create caddy" >/dev/null 2>&1
 }
 
 function deploy() {

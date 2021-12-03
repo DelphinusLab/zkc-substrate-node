@@ -9,10 +9,7 @@ services:
       - "19944:9944"
     volumes:
       - zhenxunge-node-alice-data:/data
-    deploy:
-      restart_policy:
-        condition: on-failure
-        max_attempts: 10
+    restart: unless-stopped
 
   node-bob:
     image: zhenxunge-node
@@ -23,10 +20,7 @@ services:
       - "29944:9944"
     volumes:
       - zhenxunge-node-bob-data:/data
-    deploy:
-      restart_policy:
-        condition: on-failure
-        max_attempts: 10
+    restart: unless-stopped
 
   node-charlie:
     image: zhenxunge-node
@@ -37,10 +31,7 @@ services:
       - "39944:9944"
     volumes:
       - zhenxunge-node-charlie-data:/data
-    deploy:
-      restart_policy:
-        condition: on-failure
-        max_attempts: 10
+    restart: unless-stopped
 
 networks:
   zhenxunge-node:
