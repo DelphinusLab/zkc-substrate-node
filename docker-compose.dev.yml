@@ -1,0 +1,48 @@
+version: "3.9"
+services:
+  node-alice:
+    image: zhenxunge-node
+    networks:
+      - zhenxunge-node
+    ports:
+      - "9944:9944"
+    volumes:
+      - zhenxunge-node-alice-data:/data
+    deploy:
+      restart_policy:
+        condition: on-failure
+        max_attempts: 10
+
+  node-bob:
+    image: zhenxunge-node
+    networks:
+      - zhenxunge-node
+    ports:
+      - "19944:9944"
+    volumes:
+      - zhenxunge-node-bob-data:/data
+    deploy:
+      restart_policy:
+        condition: on-failure
+        max_attempts: 10
+
+  node-charlie:
+    image: zhenxunge-node
+    networks:
+      - zhenxunge-node
+    ports:
+      - "29944:9944"
+    volumes:
+      - zhenxunge-node-charlie-data:/data
+    deploy:
+      restart_policy:
+        condition: on-failure
+        max_attempts: 10
+
+networks:
+  zhenxunge-node:
+
+volumes:
+  zhenxunge-node-alice-data:
+  zhenxunge-node-bob-data:
+  zhenxunge-node-charlie-data:
