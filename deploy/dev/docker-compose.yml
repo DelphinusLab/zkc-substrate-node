@@ -5,7 +5,7 @@ services:
     networks:
       - zhenxunge-node
     ports:
-      - "9944:9944"
+      - "19944:9944"
     volumes:
       - zhenxunge-node-alice-data:/data
     deploy:
@@ -18,7 +18,7 @@ services:
     networks:
       - zhenxunge-node
     ports:
-      - "19944:9944"
+      - "29944:9944"
     volumes:
       - zhenxunge-node-bob-data:/data
     deploy:
@@ -31,7 +31,7 @@ services:
     networks:
       - zhenxunge-node
     ports:
-      - "29944:9944"
+      - "39944:9944"
     volumes:
       - zhenxunge-node-charlie-data:/data
     deploy:
