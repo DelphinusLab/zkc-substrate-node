@@ -17,6 +17,13 @@ pub fn nonce_check<T: Config>(account: &T::AccountId, nonce: NonceId) -> Result<
     return Ok(new_nonce);
 }
 
+pub fn l1account_check<T: Config>(l1account: L1Account) -> Result<L1Account, Error<T>> {
+    l1account
+        .valid_on_bn128()
+        .ok_or(Error::<T>::L1AccountOverflow)?;
+    return Ok(l1account);
+}
+
 /* ---- Account Index ---- */
 pub fn get_account_index<T: Config>(account: &T::AccountId) -> Result<AccountIndex, Error<T>> {
     let account_index = AccountIndexMap::<T>::get(&account).ok_or(Error::<T>::AccountNotExists)?;
@@ -183,9 +190,6 @@ pub trait Bn128<T> {
     fn valid_on_bn128(&self) -> Option<T>;
 }
 
-// TODO: change MAX to true value
-const MAX: u32 = 1u32 << 10;
-
 impl Bn128<U256> for U256 {
     fn checked_add_on_bn128(&self, rhs: U256) -> Option<U256> {
         match self.checked_add(rhs) {
@@ -195,7 +199,11 @@ impl Bn128<U256> for U256 {
     }
 
     fn valid_on_bn128(&self) -> Option<U256> {
-        match *self > U256::from(MAX) {
+        let maximum = U256::from_dec_str(
+            "21888242871839275222246405745257275088548364400416034343698204186575808495617",
+        )
+        .ok()?;
+        match *self > maximum {
             true => None,
             false => Some(*self),
         }

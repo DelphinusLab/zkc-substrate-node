@@ -331,6 +331,7 @@ decl_module! {
             let req_id = req_id_get::<T>()?;
             let new_nonce = nonce_check::<T>(&account, nonce)?;
             let new_balance = balance_sub::<T>(&account_index, &token_index, amount)?;
+            l1account_check::<T>(l1account)?;
 
             let mut command = [0u8; 81];
             command[0] = OP_WITHDRAW;
