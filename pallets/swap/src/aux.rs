@@ -13,10 +13,15 @@ pub fn nonce_check<T: Config>(account: &T::AccountId, nonce: NonceId) -> Result<
         return Err(Error::<T>::NonceInconsistent);
     }
 
-    let new_nonce = nonce
-        .checked_add(1u64)
-        .ok_or(Error::<T>::NonceOverflow)?;
+    let new_nonce = nonce.checked_add(1u64).ok_or(Error::<T>::NonceOverflow)?;
     return Ok(new_nonce);
+}
+
+pub fn l1account_check<T: Config>(l1account: L1Account) -> Result<L1Account, Error<T>> {
+    l1account
+        .valid_on_bn128()
+        .ok_or(Error::<T>::L1AccountOverflow)?;
+    return Ok(l1account);
 }
 
 /* ---- Account Index ---- */
@@ -83,7 +88,7 @@ pub fn balance_add<T: Config>(
     amount: Amount,
 ) -> Result<Amount, Error<T>> {
     let new_amount = BalanceMap::get((&account_index, token_index))
-        .checked_add(amount)
+        .checked_add_on_bn128(amount)
         .ok_or(Error::<T>::BalanceOverflow)?;
     return Ok(new_amount);
 }
@@ -111,10 +116,11 @@ pub fn pool_change<T: Config>(
     is_add_1: bool,
     change_1: Amount,
 ) -> Result<(Amount, Amount), Error<T>> {
-    let (token_index_0, token_index_1, amount_0, amount_1) = PoolMap::get(pool_index).ok_or(Error::<T>::PoolNotExists)?;
+    let (token_index_0, token_index_1, amount_0, amount_1) =
+        PoolMap::get(pool_index).ok_or(Error::<T>::PoolNotExists)?;
     let new_amount_0 = if is_add_0 {
         amount_0
-            .checked_add(change_0)
+            .checked_add_on_bn128(change_0)
             .ok_or(Error::<T>::PoolBalanceOverflow)?
     } else {
         amount_0
@@ -123,7 +129,7 @@ pub fn pool_change<T: Config>(
     };
     let new_amount_1 = if is_add_1 {
         amount_1
-            .checked_add(change_1)
+            .checked_add_on_bn128(change_1)
             .ok_or(Error::<T>::PoolBalanceOverflow)?
     } else {
         amount_1
@@ -144,7 +150,7 @@ pub fn share_add<T: Config>(
     amount: Amount,
 ) -> Result<Amount, Error<T>> {
     let new_amount = ShareMap::get((account_index, pool_index))
-        .checked_add(amount)
+        .checked_add_on_bn128(amount)
         .ok_or(Error::<T>::ShareOverflow)?;
     return Ok(new_amount);
 }
@@ -162,7 +168,7 @@ pub fn share_sub<T: Config>(
 
 pub fn req_id_get<T: Config>() -> Result<ReqId, Error<T>> {
     let req_id = ReqIndex::get()
-        .checked_add(U256::from(1))
+        .checked_add_on_bn128(U256::from(1))
         .ok_or(Error::<T>::ReqIdOverflow)?;
     return Ok(req_id);
 }
@@ -176,6 +182,31 @@ impl U256ToByte for U256 {
         let mut buf = [0u8; 32];
         self.to_little_endian(&mut buf);
         buf
+    }
+}
+
+pub trait Bn128<T> {
+    fn checked_add_on_bn128(&self, rhs: T) -> Option<T>;
+    fn valid_on_bn128(&self) -> Option<T>;
+}
+
+impl Bn128<U256> for U256 {
+    fn checked_add_on_bn128(&self, rhs: U256) -> Option<U256> {
+        match self.checked_add(rhs) {
+            None => None,
+            Some(res) => res.valid_on_bn128(),
+        }
+    }
+
+    fn valid_on_bn128(&self) -> Option<U256> {
+        let maximum = U256::from_dec_str(
+            "21888242871839275222246405745257275088548364400416034343698204186575808495617",
+        )
+        .ok()?;
+        match *self > maximum {
+            true => None,
+            false => Some(*self),
+        }
     }
 }
 
@@ -207,7 +238,11 @@ fn _check_sign<T: Config>(data: &[u8], sign: Signature, key: PublicKey) -> Resul
     }
 }
 
-pub fn check_sign<T: Config>(account_index: AccountIndex, command: &[u8], sign: &[u8]) -> Result<Signature, Error<T>> {
+pub fn check_sign<T: Config>(
+    account_index: AccountIndex,
+    command: &[u8],
+    sign: &[u8],
+) -> Result<Signature, Error<T>> {
     let key = KeyMap::get(account_index).ok_or(Error::<T>::InvalidAccount)?;
     let _r = BabyJubjubPoint::decode(&sign[..32]).map_err(|_| Error::<T>::InvalidSignature)?;
     let _s = BabyJubjubField::decode(&sign[32..]);

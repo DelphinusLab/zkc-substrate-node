@@ -29,6 +29,7 @@ decl_error! {
         PoolNotExists,
         PoolIndexOverflow,
         L1TXExists,
+        L1AccountOverflow,
         InvalidTokenPair,
         InvalidTokenIndex,
         InvalidAmount,
