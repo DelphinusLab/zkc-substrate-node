@@ -203,7 +203,7 @@ impl Bn128<U256> for U256 {
             "21888242871839275222246405745257275088548364400416034343698204186575808495617",
         )
         .ok()?;
-        match *self > maximum {
+        match *self >= maximum {
             true => None,
             false => Some(*self),
         }
