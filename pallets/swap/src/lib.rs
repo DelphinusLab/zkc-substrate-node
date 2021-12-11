@@ -231,9 +231,9 @@ decl_module! {
 
             let mut command = [0u8; 81];
             command[0] = OP_ADDPOOL;
-            command[1..9].copy_from_slice(&nonce.to_le_bytes());
-            command[9..13].copy_from_slice(&token_index_0.to_le_bytes());
-            command[13..17].copy_from_slice(&token_index_1.to_le_bytes());
+            command[1..9].copy_from_slice(&nonce.to_be_bytes());
+            command[9..13].copy_from_slice(&token_index_0.to_be_bytes());
+            command[13..17].copy_from_slice(&token_index_1.to_be_bytes());
             // command[17..49] and command[49..81] is reserved in current implementataion.
             let sign = check_sign::<T>(who_account_index, &command, &sign)?;
 
@@ -291,11 +291,11 @@ decl_module! {
 
             let mut command = [0u8; 81];
             command[0] = OP_DEPOSIT;
-            command[1..9].copy_from_slice(&nonce.to_le_bytes());
-            command[9..13].copy_from_slice(&account_index.to_le_bytes());
-            command[13..17].copy_from_slice(&token_index.to_le_bytes());
-            command[17..49].copy_from_slice(&amount.to_le_bytes());
-            command[49..81].copy_from_slice(&l1_tx_hash.to_le_bytes());
+            command[1..9].copy_from_slice(&nonce.to_be_bytes());
+            command[9..13].copy_from_slice(&account_index.to_be_bytes());
+            command[13..17].copy_from_slice(&token_index.to_be_bytes());
+            command[17..49].copy_from_slice(&amount.to_be_bytes());
+            command[49..81].copy_from_slice(&l1_tx_hash.to_be_bytes());
             let sign = check_sign::<T>(who_account_index, &command, &sign)?;
 
             let req_id = req_id_get::<T>()?;
@@ -335,11 +335,11 @@ decl_module! {
 
             let mut command = [0u8; 81];
             command[0] = OP_WITHDRAW;
-            command[1..9].copy_from_slice(&nonce.to_le_bytes());
-            command[9..13].copy_from_slice(&account_index.to_le_bytes());
-            command[13..17].copy_from_slice(&token_index.to_le_bytes());
-            command[17..49].copy_from_slice(&amount.to_le_bytes());
-            command[49..81].copy_from_slice(&l1account.to_le_bytes());
+            command[1..9].copy_from_slice(&nonce.to_be_bytes());
+            command[9..13].copy_from_slice(&account_index.to_be_bytes());
+            command[13..17].copy_from_slice(&token_index.to_be_bytes());
+            command[17..49].copy_from_slice(&amount.to_be_bytes());
+            command[49..81].copy_from_slice(&l1account.to_be_bytes());
             let sign = check_sign::<T>(account_index, &command, &sign)?;
 
             let op = Ops::Withdraw(sign.0, sign.1, sign.2, nonce, account_index, token_index, amount, l1account);
@@ -378,11 +378,11 @@ decl_module! {
 
             let mut command = [0u8; 81];
             command[0] = OP_SWAP;
-            command[1..9].copy_from_slice(&nonce.to_le_bytes());
-            command[9..13].copy_from_slice(&account_index.to_le_bytes());
-            command[13..17].copy_from_slice(&pool_index.to_le_bytes());
-            command[17..49].copy_from_slice(&U256::from(reverse).to_le_bytes());
-            command[49..81].copy_from_slice(&amount.to_le_bytes());
+            command[1..9].copy_from_slice(&nonce.to_be_bytes());
+            command[9..13].copy_from_slice(&account_index.to_be_bytes());
+            command[13..17].copy_from_slice(&pool_index.to_be_bytes());
+            command[17..49].copy_from_slice(&U256::from(reverse).to_be_bytes());
+            command[49..81].copy_from_slice(&amount.to_be_bytes());
             let sign = check_sign::<T>(account_index, &command, &sign)?;
 
             let new_balance_from = balance_sub::<T>(&account_index, &token0, amount)?;
@@ -429,11 +429,11 @@ decl_module! {
 
             let mut command = [0u8; 81];
             command[0] = OP_SUPPLY;
-            command[1..9].copy_from_slice(&nonce.to_le_bytes());
-            command[9..13].copy_from_slice(&account_index.to_le_bytes());
-            command[13..17].copy_from_slice(&pool_index.to_le_bytes());
-            command[17..49].copy_from_slice(&amount0.to_le_bytes());
-            command[49..81].copy_from_slice(&amount1.to_le_bytes());
+            command[1..9].copy_from_slice(&nonce.to_be_bytes());
+            command[9..13].copy_from_slice(&account_index.to_be_bytes());
+            command[13..17].copy_from_slice(&pool_index.to_be_bytes());
+            command[17..49].copy_from_slice(&amount0.to_be_bytes());
+            command[49..81].copy_from_slice(&amount1.to_be_bytes());
             let sign = check_sign::<T>(account_index, &command, &sign)?;
 
             let new_balance_from = balance_sub::<T>(&account_index, &token0, amount0)?;
@@ -479,11 +479,11 @@ decl_module! {
 
             let mut command = [0u8; 81];
             command[0] = OP_RETRIEVE;
-            command[1..9].copy_from_slice(&nonce.to_le_bytes());
-            command[9..13].copy_from_slice(&account_index.to_le_bytes());
-            command[13..17].copy_from_slice(&pool_index.to_le_bytes());
-            command[17..49].copy_from_slice(&amount0.to_le_bytes());
-            command[49..81].copy_from_slice(&amount1.to_le_bytes());
+            command[1..9].copy_from_slice(&nonce.to_be_bytes());
+            command[9..13].copy_from_slice(&account_index.to_be_bytes());
+            command[13..17].copy_from_slice(&pool_index.to_be_bytes());
+            command[17..49].copy_from_slice(&amount0.to_be_bytes());
+            command[49..81].copy_from_slice(&amount1.to_be_bytes());
             let sign = check_sign::<T>(account_index, &command, &sign)?;
 
             // for user account

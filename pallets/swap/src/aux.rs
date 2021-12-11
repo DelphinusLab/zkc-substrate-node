@@ -174,13 +174,13 @@ pub fn req_id_get<T: Config>() -> Result<ReqId, Error<T>> {
 }
 
 pub trait U256ToByte {
-    fn to_le_bytes(&self) -> [u8; 32];
+    fn to_be_bytes(&self) -> [u8; 32];
 }
 
 impl U256ToByte for U256 {
-    fn to_le_bytes(&self) -> [u8; 32] {
+    fn to_be_bytes(&self) -> [u8; 32] {
         let mut buf = [0u8; 32];
-        self.to_little_endian(&mut buf);
+        self.to_big_endian(&mut buf);
         buf
     }
 }
@@ -211,7 +211,7 @@ impl Bn128<U256> for U256 {
 }
 
 pub fn u256_to_bigint(x: &U256) -> BigInt {
-    BigInt::from_bytes_le(Sign::Plus, &x.to_le_bytes())
+    BigInt::from_bytes_be(Sign::Plus, &x.to_be_bytes())
 }
 
 pub fn u256_from_bigint(x: &BigInt) -> U256 {
