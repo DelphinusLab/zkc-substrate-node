@@ -166,6 +166,43 @@ pub fn share_sub<T: Config>(
     return Ok(new_amount);
 }
 
+/* --- NFT --- */
+
+trait NFTData<T: Config> {
+    fn checked_empty(&self) -> Result<(), Error<T>>;
+    fn checked_owner(&self, account_index: &AccountIndex) -> Result<(), Error<T>>;
+}
+
+impl<T:Config> NFTData<T> for (AccountIndex, Amount, Option<AccountIndex>) {
+    fn checked_empty(&self) -> Result<(), Error<T>> {
+        return Ok(());
+    }
+
+    fn checked_owner(&self, account_index: &AccountIndex) -> Result<(), Error<T>> {
+        return Ok(());
+    }
+}
+
+pub fn nft_add<T: Config>(
+    account_index: &AccountIndex,
+    nft_id: &NFTId,
+) -> Result<(), Error<T>> {
+    let nft = NFTMap::get(&nft_id);
+    nft.checked_empty()?;
+    return Ok(());
+}
+
+pub fn nft_widthdraw<T: Config>(
+    account_index: &AccountIndex,
+    nft_id: &NFTId,
+) -> Result<(), Error<T>> {
+    let nft = NFTMap::get(&nft_id);
+    nft.checked_owner(account_index)?;
+    let bidder: Option<AccountIndex> = None;
+    NFTMap::insert(nft_id, (0, U256::from(0), bidder));
+    return Ok(());
+}
+
 pub fn req_id_get<T: Config>() -> Result<ReqId, Error<T>> {
     let req_id = ReqIndex::get()
         .checked_add_on_circuit(U256::from(1))

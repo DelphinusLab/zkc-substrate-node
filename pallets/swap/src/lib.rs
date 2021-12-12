@@ -47,6 +47,10 @@ const OP_RETRIEVE: u8 = 3u8;
 const OP_SUPPLY: u8 = 4u8;
 const OP_ADDPOOL: u8 = 5u8;
 const OP_SETKEY: u8 = 6u8;
+const OP_DEPOSIT_NFT: u8 = 7u8;
+const OP_WITHDRAW_NFT: u8 = 8u8;
+const OP_TRANSFER: u8 = 9u8;
+const OP_TRANSFER_NFT: u8 = 10u8;
 
 decl_event!(
     pub enum Event<T>
@@ -135,6 +139,15 @@ decl_event!(
             PoolIndex,
             AccountIndex
         ),
+        DepositNFT(
+            ReqId,
+            SignatureRX,
+            SignatureRY,
+            SignatureS,
+            NonceId,
+            AccountIndex,
+            NFTId
+        ),
         Ack(ReqId, u8),
         Abort(ReqId),
         RewardFunds(AccountId, Balance, BlockNumber),
@@ -149,9 +162,14 @@ decl_storage! {
         pub PoolIndexCount: PoolIndex;
         pub PoolIndexMap get(fn pool_index_map): map hasher(blake2_128_concat) (TokenIndex, TokenIndex) => Option<PoolIndex>;
 
+        pub NFTID: NFTId;
+
         pub BalanceMap get(fn balance_map): map hasher(blake2_128_concat) (AccountIndex, TokenIndex) => Amount;
         pub ShareMap get(fn share_map): map hasher(blake2_128_concat) (AccountIndex, PoolIndex) => Amount;
         pub PoolMap get(fn pool_map): map hasher(blake2_128_concat) PoolIndex => Option<(TokenIndex, TokenIndex, Amount, Amount)>;
+
+        /* Owner * bid * CurrentWinner */
+        pub NFTMap get(fn nft_map): map hasher(blake2_128_concat) NFTId => (AccountIndex, Amount, Option<AccountIndex>);
 
         pub PendingReqMap get(fn pending_req_map): map hasher(blake2_128_concat) ReqId => Option<Ops>;
         pub CompleteReqMap get(fn complete_req_map): map hasher(blake2_128_concat) ReqId => Option<Ops>;
@@ -537,6 +555,49 @@ decl_module! {
 
             return Ok(());
         }
+
+        #[weight = 10_000 + T::DbWeight::get().writes(1)]
+        pub fn deposit_nft(
+            origin,
+            sign: [u8; 64],
+            account_index: AccountIndex,
+            nft_id: NFTId,
+            l1_tx_hash: L1TxHash,
+            nonce: NonceId
+        ) -> dispatch::DispatchResult {
+            let who = ensure_signed(origin)?;
+            let who_account_index = get_account_index::<T>(&who)?;
+
+            if L1TxMap::get(l1_tx_hash) != 0u8 {
+                return Err(Error::<T>::L1TXExists)?;
+            }
+
+            let new_nonce = nonce_check::<T>(&who, nonce)?;
+
+            let mut command = [0u8; 81];
+            command[0] = OP_DEPOSIT_NFT;
+            command[1..9].copy_from_slice(&nonce.to_be_bytes());
+            command[9..13].copy_from_slice(&account_index.to_be_bytes());
+            command[13..17].copy_from_slice(&nft_id.to_be_bytes());
+            command[17..49].copy_from_slice(&l1_tx_hash.to_be_bytes());
+            let sign = check_sign::<T>(who_account_index, &command, &sign)?;
+
+            let req_id = req_id_get::<T>()?;
+
+            let new_balance_amount = nft_add::<T>(&account_index, &nft_id)?;
+            let op = Ops::DepositNFT(sign.0, sign.1, sign.2, nonce, account_index, nft_id);
+
+            PendingReqMap::insert(&req_id, op);
+            ReqIndex::put(req_id);
+            NonceMap::<T>::insert(&who, new_nonce);
+            DepositMap::insert(&req_id, l1_tx_hash);
+            L1TxMap::insert(&l1_tx_hash, PENDING);
+
+            Self::deposit_event(Event::<T>::DepositNFT(req_id, sign.0, sign.1, sign.2, nonce, account_index, nft_id));
+            return Ok(());
+        }
+
+
 
         #[weight = 10_000 + T::DbWeight::get().writes(1)]
         pub fn ack(

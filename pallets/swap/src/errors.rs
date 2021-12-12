@@ -6,6 +6,7 @@ decl_error! {
         NoneValue,
         BalanceOverflow,
         BalanceNotEnough,
+        NFTNoAuthority,
         LockedBalanceOverflow,
         LockedBalanceNotEnough,
         PoolBalanceNotEnough,
