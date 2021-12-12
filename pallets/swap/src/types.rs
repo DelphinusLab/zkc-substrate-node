@@ -11,6 +11,7 @@ pub type L1TxHash = U256;
 pub type AccountIndex = u32;
 pub type TokenIndex = u32;
 pub type PoolIndex = u32;
+pub type NFTId = u32;
 
 pub type SignatureRX = U256;
 pub type SignatureRY = U256;
@@ -36,4 +37,20 @@ pub enum Ops {
     PoolSupply(SignatureRX, SignatureRY, SignatureS, NonceId, AccountIndex, PoolIndex, Amount, Amount),
     PoolRetrieve(SignatureRX, SignatureRY, SignatureS, NonceId, AccountIndex, PoolIndex, Amount, Amount),
     AddPool(SignatureRX, SignatureRY, SignatureS, NonceId, TokenIndex, TokenIndex, ReserveU256, ReserveU256, PoolIndex),
+    AddNFT(
+        SignatureRX, SignatureRY, SignatureS, NonceId,
+        NFTId
+    ),
+    DepositNFT(
+        SignatureRX, SignatureRY, SignatureS, NonceId,
+        AccountIndex, NFTId
+    ),
+    WithdrawNFT(
+        SignatureRX, SignatureRY, SignatureS, NonceId,
+        AccountIndex, NFTId
+    ),
+    TransferNFT(
+        SignatureRX, SignatureRY, SignatureS, NonceId,
+        AccountIndex, AccountIndex, NFTId
+    ),
 }
