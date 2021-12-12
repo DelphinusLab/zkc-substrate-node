@@ -9,6 +9,9 @@ use sp_core::U256;
 #[cfg(test)]
 mod mock;
 
+#[cfg(feature = "runtime-benchmarks")]
+mod benchmarking;
+
 pub trait Config: frame_system::Config {
     type Currency: Currency<Self::AccountId> + ReservableCurrency<Self::AccountId>;
     type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;

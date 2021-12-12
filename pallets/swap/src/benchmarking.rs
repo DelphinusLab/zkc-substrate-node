@@ -1,15 +1,13 @@
 #![cfg(feature = "runtime-benchmarks")]
 
 use crate::*;
-use frame_benchmarking::{benchmarks, whitelisted_caller};
+use frame_benchmarking::benchmarks;
 use frame_system::RawOrigin;
+use sp_std::{boxed::*, vec, vec::*};
 
 benchmarks! {
     add_pool_benchmark {
-        let a in 1...1000;
-        let b in 2...1001;
-        let n in 1...1000;
-    }: add_pool(RawOrigin::Root, a.into(), b.into(), n.into())
-
-    impl_benchmark_test_suit!(Pallet, crate::tests::new_test_ext(), crate::tests::Test)
+        let caller: T::AccountId = <T as Config>::ADMIN1::get();
+        NonceMap::<T>::insert(&caller, U256::from(1));
+    }: add_pool(RawOrigin::Signed(caller), 10u32.into(), 20u32.into(), 1u32.into())
 }
