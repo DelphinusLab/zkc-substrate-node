@@ -146,6 +146,16 @@ decl_event!(
             AccountIndex,
             NFTId
         ),
+        WithdrawNFT(
+            ReqId,
+            SignatureRX,
+            SignatureRY,
+            SignatureS,
+            NonceId,
+            AccountIndex,
+            NFTId,
+            L1Account,
+        ),
         Ack(ReqId, u8),
         Abort(ReqId),
         RewardFunds(AccountId, Balance, BlockNumber),
@@ -572,7 +582,44 @@ decl_module! {
             return Ok(());
         }
 
+        #[weight = 10_000 + T::DbWeight::get().writes(1)]
+        pub fn withdraw_nft(
+            origin,
+            sign: [u8; 64],
+            nft_id: NFTId,
+            l1account: L1Account,
+            nonce: NonceId
+        ) -> dispatch::DispatchResult {
+            let who = ensure_signed(origin)?;
+            let account = who;
+            let account_index = get_account_index::<T>(&account)?;
 
+            let req_id = req_id_get::<T>()?;
+            l1account_check::<T>(l1account)?;
+            let new_nonce = nonce_check::<T>(&account, nonce)?;
+
+            let mut command = [0u8; 81];
+            command[0] = OP_WITHDRAW;
+            command[1..9].copy_from_slice(&nonce.to_be_bytes());
+            command[9..13].copy_from_slice(&account_index.to_be_bytes());
+            command[13..17].copy_from_slice(&nft_id.to_be_bytes());
+            command[17..49].copy_from_slice(&l1account.to_be_bytes());
+            let sign = check_sign::<T>(account_index, &command, &sign)?;
+
+            let op = Ops::WithdrawNFT(sign.0, sign.1, sign.2, nonce, account_index, nft_id, l1account);
+            PendingReqMap::insert(&req_id, op);
+            ReqIndex::put(req_id);
+
+            nft_widthdraw::<T>(&account_index, &nft_id);
+            NonceMap::<T>::insert(&account, new_nonce);
+
+            Self::deposit_event(Event::<T>::WithdrawNFT(
+                req_id,
+                sign.0, sign.1, sign.2, nonce, account_index, nft_id, l1account
+            ));
+
+            return Ok(());
+        }
 
         #[weight = 10_000 + T::DbWeight::get().writes(1)]
         pub fn ack(

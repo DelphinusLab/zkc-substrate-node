@@ -47,7 +47,7 @@ pub enum Ops {
     ),
     WithdrawNFT(
         SignatureRX, SignatureRY, SignatureS, NonceId,
-        AccountIndex, NFTId
+        AccountIndex, NFTId, L1Account
     ),
     TransferNFT(
         SignatureRX, SignatureRY, SignatureS, NonceId,
