@@ -295,7 +295,7 @@ decl_module! {
             command[9..13].copy_from_slice(&account_index.to_be_bytes());
             command[13..17].copy_from_slice(&token_index.to_be_bytes());
             command[17..49].copy_from_slice(&amount.to_be_bytes());
-            command[49..81].copy_from_slice(&l1_tx_hash.to_be_bytes());
+            // command[49..81] is reserved. The l1_tx_hash exceeds field limits, so not in signature.
             let sign = check_sign::<T>(who_account_index, &command, &sign)?;
 
             let req_id = req_id_get::<T>()?;
