@@ -438,7 +438,7 @@ decl_module! {
 
             let new_balance_from = balance_sub::<T>(&account_index, &token0, amount0)?;
             let new_balance_to = balance_sub::<T>(&account_index, &token1, amount1)?;
-            let new_share = share_add::<T>(&account_index, &pool_index, amount0.checked_add_on_bn128(amount1).ok_or(Error::<T>::ShareOverflow)?)?;
+            let new_share = share_add::<T>(&account_index, &pool_index, amount0.checked_add_on_circuit(amount1).ok_or(Error::<T>::ShareOverflow)?)?;
 
             pool_change::<T>(&pool_index, true, amount0, true, amount1)?;
 
@@ -489,7 +489,7 @@ decl_module! {
             // for user account
             let new_balance_from = balance_add::<T>(&account_index, &token0, amount0)?;
             let new_balance_to = balance_add::<T>(&account_index, &token1, amount1)?;
-            let new_share = share_sub::<T>(&account_index, &pool_index, amount0.checked_add_on_bn128(amount1).ok_or(Error::<T>::ShareNotEnough)?)?;
+            let new_share = share_sub::<T>(&account_index, &pool_index, amount0.checked_add_on_circuit(amount1).ok_or(Error::<T>::ShareNotEnough)?)?;
 
             // for pool
             pool_change::<T>(&pool_index, false, amount0, false, amount1)?;
