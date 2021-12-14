@@ -179,7 +179,11 @@ impl<T:Config> NFTData<T> for (AccountIndex, Amount, Option<AccountIndex>) {
     }
 
     fn checked_owner(&self, account_index: &AccountIndex) -> Result<(), Error<T>> {
-        return Ok(());
+        if self.0 != *account_index {
+            return Err(Error::<T>::InvalidTokenIndex)?;
+        } else {
+            return Ok(());
+        }
     }
 }
 
@@ -189,6 +193,8 @@ pub fn nft_add<T: Config>(
 ) -> Result<(), Error<T>> {
     let nft = NFTMap::get(&nft_id);
     nft.checked_empty()?;
+    let bidder: Option<AccountIndex> = None;
+    NFTMap::insert(nft_id, (account_index, U256::from(0), bidder));
     return Ok(());
 }
 
@@ -200,6 +206,18 @@ pub fn nft_widthdraw<T: Config>(
     nft.checked_owner(account_index)?;
     let bidder: Option<AccountIndex> = None;
     NFTMap::insert(nft_id, (0, U256::from(0), bidder));
+    return Ok(());
+}
+
+pub fn nft_transfer<T: Config>(
+    from_index: &AccountIndex,
+    to_index: &AccountIndex,
+    nft_id: &NFTId,
+) -> Result<(), Error<T>> {
+    let nft = NFTMap::get(&nft_id);
+    nft.checked_owner(from_index)?;
+    let bidder: Option<AccountIndex> = None;
+    NFTMap::insert(nft_id, (to_index, U256::from(0), bidder));
     return Ok(());
 }
 
