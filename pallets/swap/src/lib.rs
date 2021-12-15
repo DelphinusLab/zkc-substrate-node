@@ -535,42 +535,46 @@ decl_module! {
         #[weight = 10_000 + T::DbWeight::get().writes(1)]
         pub fn ack(
             origin,
-            req_id: ReqId
+            req_id_start: ReqId
         ) -> dispatch::DispatchResult {
             let _who = ensure_signed(origin)?;
 
-            PendingReqMap::get(&req_id).ok_or(Error::<T>::InvalidReqId)?;
+            let ack = if _who == T::ADMIN1::get() {
+                ACK1
+            } else {
+                ACK2
+            };
 
-            let mut acks = AckMap::get(&req_id);
+            let batch_size = 10;
 
-            if _who == T::ADMIN1::get() {
-                acks = acks | ACK1;
+            for i in 0..batch_size {
+                let req_id = req_id_start + i;
+
+                PendingReqMap::get(&req_id).ok_or(Error::<T>::InvalidReqId)?;
+
+                let acks = AckMap::get(&req_id) | ack;
+
+                AckMap::insert(&req_id, &acks);
+
+                if acks == NACK {
+                    let l1txhash = DepositMap::get(&req_id);
+                    match l1txhash {
+                        None => {},
+                        Some(v) => {
+                            L1TxMap::insert(v, DONE);
+                        }
+                    };
+                    match PendingReqMap::get(&req_id) {
+                        Some (req) => {
+                            CompleteReqMap::insert(req_id, req);
+                            PendingReqMap::remove(&req_id);
+                        },
+                        _ => {}
+                    };
+                }
             }
 
-            if _who == T::ADMIN2::get() {
-                acks = acks | ACK2;
-            }
-
-            AckMap::insert(&req_id, &acks);
-
-            if acks == NACK {
-                let l1txhash = DepositMap::get(&req_id);
-                match l1txhash {
-                    None => {},
-                    Some(v) => {
-                        L1TxMap::insert(v, DONE);
-                    }
-                };
-                match PendingReqMap::get(&req_id) {
-                    Some (req) => {
-                        CompleteReqMap::insert(req_id, req);
-                        PendingReqMap::remove(&req_id);
-                    },
-                    _ => {}
-                };
-            }
-
-            Self::deposit_event(RawEvent::Ack(req_id, acks));
+            Self::deposit_event(RawEvent::Ack(req_id_start, ack));
             return Ok(());
         }
     }
