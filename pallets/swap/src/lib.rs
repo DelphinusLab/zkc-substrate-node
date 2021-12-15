@@ -76,6 +76,7 @@ decl_event!(
             TokenIndex,
             Amount,
             ReserveU256,
+            AccountIndex
         ),
         Withdraw(
             ReqId,
@@ -132,6 +133,7 @@ decl_event!(
             ReserveU256,
             ReserveU256,
             PoolIndex,
+            AccountIndex
         ),
         Ack(ReqId, u8),
         Abort(ReqId),
@@ -247,7 +249,7 @@ decl_module! {
                 };
 
             let pool_index = create_pool_index::<T>(&_token_index_0, &_token_index_1)?;
-            let op = Ops::AddPool(sign.0, sign.1, sign.2, nonce, token_index_0, token_index_1, U256::from(0), U256::from(0), pool_index);
+            let op = Ops::AddPool(sign.0, sign.1, sign.2, nonce, token_index_0, token_index_1, U256::from(0), U256::from(0), pool_index, who_account_index);
 
             PendingReqMap::insert(&req_id, op);
             ReqIndex::put(req_id);
@@ -255,7 +257,8 @@ decl_module! {
 
             Self::deposit_event(Event::<T>::AddPool(
                 req_id, sign.0, sign.1, sign.2, nonce,
-                token_index_0, token_index_1, U256::from(0), U256::from(0), pool_index
+                token_index_0, token_index_1, U256::from(0), U256::from(0),
+                pool_index, who_account_index
             ));
             return Ok(());
         }
@@ -275,7 +278,11 @@ decl_module! {
 
             let who_account_index = get_account_index::<T>(&who)?;
 
-            if token_index >= AccountIndexCount::get() {
+            if token_index >= MAX_TOKEN_COUNT {
+                return Err(Error::<T>::InvalidTokenIndex)?;
+            }
+
+            if account_index >= AccountIndexCount::get() {
                 return Err(Error::<T>::InvalidAccount)?;
             }
 
@@ -283,9 +290,7 @@ decl_module! {
                 return Err(Error::<T>::L1TXExists)?;
             }
 
-            if amount == U256::from(0) {
-                return Err(Error::<T>::InvalidAmount)?;
-            }
+            amount.valid_on_circuit().ok_or(Error::<T>::InvalidAmount)?;
 
             let new_nonce = nonce_check::<T>(&who, nonce)?;
 
@@ -302,7 +307,7 @@ decl_module! {
 
             let new_balance_amount = balance_add::<T>(&account_index, &token_index, amount)?;
 
-            let op = Ops::Deposit(sign.0, sign.1, sign.2, nonce, account_index, token_index, amount, U256::from(0));
+            let op = Ops::Deposit(sign.0, sign.1, sign.2, nonce, account_index, token_index, amount, U256::from(0), who_account_index);
 
             balance_set(&account_index, &token_index, new_balance_amount);
             PendingReqMap::insert(&req_id, op);
@@ -311,7 +316,7 @@ decl_module! {
             DepositMap::insert(&req_id, l1_tx_hash);
             L1TxMap::insert(&l1_tx_hash, PENDING);
 
-            Self::deposit_event(Event::<T>::Deposit(req_id, sign.0, sign.1, sign.2, nonce, account_index, token_index, amount, U256::from(0)));
+            Self::deposit_event(Event::<T>::Deposit(req_id, sign.0, sign.1, sign.2, nonce, account_index, token_index, amount, U256::from(0), who_account_index));
             return Ok(());
         }
 
@@ -327,6 +332,12 @@ decl_module! {
             let who = ensure_signed(origin)?;
             let account = who;
             let account_index = get_account_index::<T>(&account)?;
+
+            if token_index >= MAX_TOKEN_COUNT {
+                return Err(Error::<T>::InvalidTokenIndex)?;
+            }
+
+            amount.valid_on_circuit().ok_or(Error::<T>::InvalidAmount)?;
 
             let req_id = req_id_get::<T>()?;
             let new_nonce = nonce_check::<T>(&account, nonce)?;
@@ -369,6 +380,8 @@ decl_module! {
             let who = ensure_signed(origin)?;
             let account = who;
             let account_index = get_account_index::<T>(&account)?;
+
+            amount.valid_on_circuit().ok_or(Error::<T>::InvalidAmount)?;
 
             let req_id = req_id_get::<T>()?;
             let new_nonce = nonce_check::<T>(&account, nonce)?;
@@ -422,6 +435,9 @@ decl_module! {
             let account = who;
             let account_index = get_account_index::<T>(&account)?;
 
+            amount0.valid_on_circuit().ok_or(Error::<T>::InvalidAmount)?;
+            amount1.valid_on_circuit().ok_or(Error::<T>::InvalidAmount)?;
+
             let (token0, token1, _, _) = PoolMap::get(&pool_index).ok_or(Error::<T>::PoolNotExists)?;
 
             let req_id = req_id_get::<T>()?;
@@ -471,6 +487,9 @@ decl_module! {
             let who = ensure_signed(origin)?;
             let account = who;
             let account_index = get_account_index::<T>(&account)?;
+
+            amount0.valid_on_circuit().ok_or(Error::<T>::InvalidAmount)?;
+            amount1.valid_on_circuit().ok_or(Error::<T>::InvalidAmount)?;
 
             let (token0, token1, _, _) = PoolMap::get(&pool_index).ok_or(Error::<T>::PoolNotExists)?;
 
