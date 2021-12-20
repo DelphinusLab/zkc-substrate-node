@@ -548,7 +548,7 @@ decl_module! {
             let batch_size = 10;
 
             for i in 0..batch_size {
-                let req_id = req_id_start + i;
+                let req_id = req_id_start + i + 1;
 
                 PendingReqMap::get(&req_id).ok_or(Error::<T>::InvalidReqId)?;
 
