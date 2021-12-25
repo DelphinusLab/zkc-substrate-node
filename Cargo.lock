@@ -3938,6 +3938,7 @@ name = "pallet-swap"
 version = "1.0.0"
 dependencies = [
  "delphinus-crypto",
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "num-bigint 0.4.3",
@@ -3947,6 +3948,7 @@ dependencies = [
  "sp-core",
  "sp-io",
  "sp-runtime",
+ "sp-std",
 ]
 
 [[package]]

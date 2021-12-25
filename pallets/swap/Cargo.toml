@@ -25,6 +25,8 @@ sp-core = { default-features = false, version = '3.0.0' }
 sha2 = { default-features = false, version = '0.9.5' }
 delphinus-crypto = { path = '../../../crypto-rust/substrate', default-features = false }
 num-bigint = { version = "0.4", features = ["rand"], default-features = false }
+frame-benchmarking = {version = '3.1.0', default-features = false, optional = true}
+sp-std = {default-features = false, version = '3.0.0'}
 
 [dev-dependencies]
 serde = { version = "1.0.119" }
@@ -36,5 +38,8 @@ default = ['std']
 std = [
     'codec/std',
     'frame-support/std',
-    'frame-system/std'
+    'frame-system/std',
+    'frame-benchmarking/std',
+    'sp-std/std',
 ]
+runtime-benchmarks = ["frame-benchmarking"]
