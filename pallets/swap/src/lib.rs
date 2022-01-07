@@ -157,6 +157,7 @@ decl_storage! {
         pub CompleteReqMap get(fn complete_req_map): map hasher(blake2_128_concat) ReqId => Option<Ops>;
         pub AckMap get(fn ack_map): map hasher(blake2_128_concat) ReqId => u8;
         pub ReqIndex get(fn req_index): ReqId;
+        pub CompleteReqIndex get(fn complete_req_index): ReqId;
         pub NonceMap get(fn nonce_map): map hasher(blake2_128_concat) T::AccountId => NonceId;
         pub KeyMap get(fn key_map): map hasher(blake2_128_concat) AccountIndex => Option<PublicKey>;
 
@@ -573,6 +574,8 @@ decl_module! {
                     };
                 }
             }
+
+            CompleteReqIndex::set(req_id_start + 10 + 1);
 
             Self::deposit_event(RawEvent::Ack(req_id_start, ack));
             return Ok(());
