@@ -575,7 +575,7 @@ decl_module! {
                 }
             }
 
-            CompleteReqIndex::set(req_id_start + 10 + 1);
+            CompleteReqIndex::set(req_id_start + 10);
 
             Self::deposit_event(RawEvent::Ack(req_id_start, ack));
             return Ok(());
