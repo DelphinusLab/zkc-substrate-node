@@ -1,26 +1,26 @@
 FROM docker.io/paritytech/ci-linux:production as builder
 
-WORKDIR /zhenxunge
-COPY . /zhenxunge
-ENV CARGO_HOME /zhenxunge/.cargo-home
-RUN --mount=type=cache,target=/zhenxunge/.cargo-home \
-    --mount=type=cache,target=/zhenxunge/target \
-    cargo build --locked --release && install -Dt ./bin/ target/release/node-swap
+WORKDIR /delphinuslab
+COPY . /delphinuslab
+ENV CARGO_HOME /delphinuslab/.cargo-home
+RUN --mount=type=cache,target=/delphinuslab/.cargo-home \
+    --mount=type=cache,target=/delphinuslab/packages/substrate-node/target \
+    cargo build --manifest-path=/delphinuslab/packages/substrate-node/Cargo.toml --locked --release && install -Dt ./bin/ /delphinuslab/packages/substrate-node/target/release/node-swap
 
-# This is the 2nd stage: a very small image where we copy the zhenxunge node binary."
+# This is the 2nd stage: a very small image where we copy the delphinuslab node binary."
 FROM docker.io/library/ubuntu:20.04
 LABEL description="Zhenxunge node"
 
-COPY --from=builder /zhenxunge/bin/ /usr/local/bin/
+COPY --from=builder /delphinuslab/bin/ /usr/local/bin/
 
-RUN useradd -m -u 1000 -U -s /bin/sh -d /zhenxunge zhenxunge && \
-	mkdir -p /data /zhenxunge/.local/share && \
-	chown -R zhenxunge:zhenxunge /data /zhenxunge && \
-	ln -s /data /zhenxunge/.local/share/node-swap && \
+RUN useradd -m -u 1000 -U -s /bin/sh -d /delphinuslab delphinuslab && \
+	mkdir -p /data /delphinuslab/.local/share && \
+	chown -R delphinuslab:delphinuslab /data /delphinuslab && \
+	ln -s /data /delphinuslab/.local/share/node-swap && \
 # Sanity checks
 	/usr/local/bin/node-swap --version
 
-USER zhenxunge
+USER delphinuslab
 EXPOSE 30333 9933 9944 9615
 VOLUME ["/data"]
 ENTRYPOINT ["/usr/local/bin/node-swap"]

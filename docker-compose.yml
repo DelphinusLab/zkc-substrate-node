@@ -18,13 +18,13 @@ services:
     labels:
       caddy: ${NODE_DOMAIN:-localhost}
       caddy.reverse_proxy: "{{upstreams 9944}}"
-    image: zhenxunge-node
+    image: delphinus-node
     networks:
       - caddy
     ports:
       - "9944:9944"
     volumes:
-      - zhenxunge-node-data:/data
+      - delphinus-node-data:/data
     restart: unless-stopped
 
 networks:
@@ -32,5 +32,5 @@ networks:
     external: true
 
 volumes:
-  zhenxunge-node-data:
+  delphinus-node-data:
   caddy-data:
