@@ -173,11 +173,16 @@ decl_module! {
 
         /// Awards the specified amount of funds to the specified account
         #[weight = 0]
-        pub fn charge(origin, account: T::AccountId, reward: BalanceOf<T>) {
+        pub fn charge(origin,
+            account: T::AccountId,
+            reward: BalanceOf<T>,
+            l1_tx_hash: L1TxHash,
+        ) {
             let who = ensure_signed(origin)?;
             let _r = T::Currency::deposit_creating(&account, reward);
             let now = <frame_system::Module<T>>::block_number();
             Self::deposit_event(RawEvent::RewardFunds(who, reward, now));
+            L1TxMap::insert(&l1_tx_hash, DONE);
             return Ok(());
         }
 
