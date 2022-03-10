@@ -198,7 +198,7 @@ pub fn nft_add<T: Config>(
     return Ok(());
 }
 
-pub fn nft_widthdraw<T: Config>(
+pub fn nft_withdraw<T: Config>(
     account_index: &AccountIndex,
     nft_id: &NFTId,
 ) -> Result<(), Error<T>> {
@@ -218,6 +218,32 @@ pub fn nft_transfer<T: Config>(
     nft.checked_owner(from_index)?;
     let bidder: Option<AccountIndex> = None;
     NFTMap::insert(nft_id, (to_index, U256::from(0), bidder));
+    return Ok(());
+}
+
+pub fn nft_bid<T: Config>(
+    account_index0: &AccountIndex,
+    account_index1: &AccountIndex,
+    amount: Amount,
+    nft_id: &NFTId,
+) -> Result<(), Error<T>> {
+    let nft = NFTMap::get(&nft_id);
+    nft.checked_owner(account_index0)?;
+    let bidder: Option<&AccountIndex> = Some(account_index1);
+    NFTMap::insert(nft_id, (account_index0, amount, bidder));
+    return Ok(());
+}
+
+pub fn nft_finalize<T: Config>(
+    account_index0: &AccountIndex,
+    account_index1: &AccountIndex,
+    nft_id: &NFTId,
+) -> Result<(), Error<T>> {
+    let nft = NFTMap::get(&nft_id);
+    nft.checked_owner(account_index0)?;
+    let _owner: Option<&AccountIndex> = Some(account_index1);
+    let bidder: Option<AccountIndex> = None;
+    NFTMap::insert(nft_id, (account_index1, U256::from(0u8), bidder));
     return Ok(());
 }
 

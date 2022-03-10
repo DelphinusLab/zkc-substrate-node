@@ -53,4 +53,13 @@ pub enum Ops {
         SignatureRX, SignatureRY, SignatureS, NonceId,
         AccountIndex, AccountIndex, NFTId
     ),
+    BidNFT(
+        SignatureRX, SignatureRY, SignatureS, NonceId,
+        AccountIndex, AccountIndex, Amount, NFTId
+    ),
+    FinalizeNFT(
+        SignatureRX, SignatureRY, SignatureS, NonceId,
+        AccountIndex, AccountIndex, Amount, NFTId
+
+    )
 }

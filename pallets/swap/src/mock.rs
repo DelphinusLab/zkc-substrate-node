@@ -6,7 +6,7 @@ use sp_runtime::{
     testing::Header,
     traits::{BlakeTwo256, IdentityLookup},
 };
-
+use frame_support::traits::{Currency, ReservableCurrency};
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
 type Block = frame_system::mocking::MockBlock<Test>;
 
@@ -18,13 +18,15 @@ frame_support::construct_runtime!(
         UncheckedExtrinsic = UncheckedExtrinsic,
     {
         System: frame_system::{Module, Call, Config, Storage, Event<T>},
-        SwapModule: swap ::{Module, Call, Storage, Event<T>},
+        SwapModule: swap::{Module, Call, Storage, Event<T>}
     }
 );
 
 parameter_types! {
     pub const BlockHashCount: u64 = 250;
     pub const SS58Prefix: u8 = 42;
+    pub const ADMIN1 : u8 = 1;
+    pub const ADMIN2 : u8 = 2;
 }
 
 impl system::Config for Test {
@@ -52,8 +54,16 @@ impl system::Config for Test {
     type SS58Prefix = SS58Prefix;
 }
 
+trait Cur: Currency<u64> + ReservableCurrency<u64> {}
+type BalanceOf<T> = <<T as swap::Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
+type PositiveImbalanceOf<T> = <<T as swap::Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::PositiveImbalance;
+type NegativeImbalanceOf<T> = <<T as swap::Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::NegativeImbalance;
+
 impl swap::Config for Test {
+    type Currency = dyn Cur<Balance = BalanceOf<Test>, PositiveImbalance = PositiveImbalanceOf<Test>, NegativeImbalance = NegativeImbalanceOf<Test>>;
     type Event = Event;
+    type ADMIN1 = ADMIN1;
+    type ADMIN2 = ADMIN2;
 }
 
 // Build genesis storage according to the mock runtime.
