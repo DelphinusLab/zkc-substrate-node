@@ -6,9 +6,27 @@ use sp_runtime::{
     testing::Header,
     traits::{BlakeTwo256, IdentityLookup},
 };
-use frame_support::traits::{Currency, ReservableCurrency};
+use pallet_balances::{Account, AccountData};
+use frame_support::traits::StorageMapShim;
+
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
 type Block = frame_system::mocking::MockBlock<Test>;
+
+parameter_types! {
+	pub static ExistentialDeposit: u64 = 0;
+    pub static MaxLocks: u32 = 50;
+}
+
+impl pallet_balances::Config for Test {
+	type Balance = u64;
+	type DustRemoval = ();
+	type Event = Event;
+	type ExistentialDeposit = ExistentialDeposit;
+	type AccountStore =
+		StorageMapShim<Account<Test>, system::Provider<Test>, u64, AccountData<u64>>;
+	type WeightInfo = ();
+	type MaxLocks = MaxLocks;
+}
 
 // Configure a mock runtime to test the pallet.
 frame_support::construct_runtime!(
@@ -18,7 +36,8 @@ frame_support::construct_runtime!(
         UncheckedExtrinsic = UncheckedExtrinsic,
     {
         System: frame_system::{Module, Call, Config, Storage, Event<T>},
-        SwapModule: swap::{Module, Call, Storage, Event<T>}
+        SwapModule: swap::{Module, Call, Storage, Event<T>},
+		Balances: pallet_balances::{Module, Call, Storage, Event<T>},
     }
 );
 
@@ -54,13 +73,8 @@ impl system::Config for Test {
     type SS58Prefix = SS58Prefix;
 }
 
-trait Cur: Currency<u64> + ReservableCurrency<u64> {}
-type BalanceOf<T> = <<T as swap::Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
-type PositiveImbalanceOf<T> = <<T as swap::Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::PositiveImbalance;
-type NegativeImbalanceOf<T> = <<T as swap::Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::NegativeImbalance;
-
 impl swap::Config for Test {
-    type Currency = dyn Cur<Balance = BalanceOf<Test>, PositiveImbalance = PositiveImbalanceOf<Test>, NegativeImbalance = NegativeImbalanceOf<Test>>;
+    type Currency = Balances;
     type Event = Event;
     type ADMIN1 = ADMIN1;
     type ADMIN2 = ADMIN2;
