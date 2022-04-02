@@ -261,17 +261,22 @@ impl pallet_sudo::Config for Runtime {
 	type Call = Call;
 }
 
+fn admins() -> Vec<AccountId> {
+    vec![
+        AccountId::from(hex_literal::hex!["d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d"]),
+        AccountId::from(hex_literal::hex!["be5ddb1579b72e84524fc29e78609e3caf42e85aa118ebfe0b0ad404b5bdd25f"])
+    ]
+}
+
 parameter_types! {
-	pub ADMIN1: AccountId = AccountId::from(hex_literal::hex!["d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d"]);
-	pub ADMIN2: AccountId = AccountId::from(hex_literal::hex!["be5ddb1579b72e84524fc29e78609e3caf42e85aa118ebfe0b0ad404b5bdd25f"]);
+    pub AckAdmins: Vec<AccountId> = admins();
 }
 
 /// Configure the swap pallet in pallets/swap.
 
 impl pallet_swap::Config for Runtime {
 	type Event = Event;
-	type ADMIN1 = ADMIN1;
-	type ADMIN2 = ADMIN2;
+	type AckAdmins = AckAdmins;
     type Currency = Balances;
 }
 

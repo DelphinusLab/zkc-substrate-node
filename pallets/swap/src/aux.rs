@@ -1,11 +1,8 @@
 use super::*;
 
 pub fn is_admin<T: Config>(who: &T::AccountId) -> Result<(), Error<T>> {
-    if *who == T::ADMIN1::get() || *who == T::ADMIN2::get() {
-        return Ok(());
-    }
-
-    return Err(Error::<T>::NoAccess);
+    let _ = T::AckAdmins::get().iter().position(|x| x== who).ok_or(Error::<T>::NoAccess)?;
+    return Ok(());
 }
 
 pub fn nonce_check<T: Config>(account: &T::AccountId, nonce: NonceId) -> Result<NonceId, Error<T>> {
