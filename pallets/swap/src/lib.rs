@@ -85,6 +85,7 @@ decl_event!(
             TokenIndex,
             Amount,
             ReserveU256,
+            AccountIndex
         ),
         Withdraw(
             ReqId,
@@ -141,6 +142,36 @@ decl_event!(
             ReserveU256,
             ReserveU256,
             PoolIndex,
+            AccountIndex
+        ),
+        DepositNFT(
+            ReqId,
+            SignatureRX,
+            SignatureRY,
+            SignatureS,
+            NonceId,
+            AccountIndex,
+            NFTId
+        ),
+        WithdrawNFT(
+            ReqId,
+            SignatureRX,
+            SignatureRY,
+            SignatureS,
+            NonceId,
+            AccountIndex,
+            NFTId,
+            L1Account,
+        ),
+        TransferNFT(
+            ReqId,
+            SignatureRX,
+            SignatureRY,
+            SignatureS,
+            NonceId,
+            AccountIndex, // From
+            AccountIndex, // To
+            NFTId,
         ),
         DepositNFT(
             ReqId,
@@ -220,6 +251,7 @@ decl_storage! {
         pub CompleteReqMap get(fn complete_req_map): map hasher(blake2_128_concat) ReqId => Option<Ops>;
         pub AckMap get(fn ack_map): map hasher(blake2_128_concat) ReqId => u8;
         pub ReqIndex get(fn req_index): ReqId;
+        pub CompleteReqIndex get(fn complete_req_index): ReqId;
         pub NonceMap get(fn nonce_map): map hasher(blake2_128_concat) T::AccountId => NonceId;
         pub KeyMap get(fn key_map): map hasher(blake2_128_concat) AccountIndex => Option<PublicKey>;
 
@@ -235,11 +267,16 @@ decl_module! {
 
         /// Awards the specified amount of funds to the specified account
         #[weight = 0]
-        pub fn charge(origin, account: T::AccountId, reward: BalanceOf<T>) {
+        pub fn charge(origin,
+            account: T::AccountId,
+            reward: BalanceOf<T>,
+            l1_tx_hash: L1TxHash,
+        ) {
             let who = ensure_signed(origin)?;
             let _r = T::Currency::deposit_creating(&account, reward);
             let now = <frame_system::Module<T>>::block_number();
             Self::deposit_event(RawEvent::RewardFunds(who, reward, now));
+            L1TxMap::insert(&l1_tx_hash, DONE);
             return Ok(());
         }
 
@@ -312,7 +349,7 @@ decl_module! {
                 };
 
             let pool_index = create_pool_index::<T>(&_token_index_0, &_token_index_1)?;
-            let op = Ops::AddPool(sign.0, sign.1, sign.2, nonce, token_index_0, token_index_1, U256::from(0), U256::from(0), pool_index);
+            let op = Ops::AddPool(sign.0, sign.1, sign.2, nonce, token_index_0, token_index_1, U256::from(0), U256::from(0), pool_index, who_account_index);
 
             PendingReqMap::insert(&req_id, op);
             ReqIndex::put(req_id);
@@ -320,7 +357,8 @@ decl_module! {
 
             Self::deposit_event(Event::<T>::AddPool(
                 req_id, sign.0, sign.1, sign.2, nonce,
-                token_index_0, token_index_1, U256::from(0), U256::from(0), pool_index
+                token_index_0, token_index_1, U256::from(0), U256::from(0),
+                pool_index, who_account_index
             ));
             return Ok(());
         }
@@ -344,13 +382,15 @@ decl_module! {
                 return Err(Error::<T>::InvalidTokenIndex)?;
             }
 
+            if account_index >= AccountIndexCount::get() {
+                return Err(Error::<T>::InvalidAccount)?;
+            }
+
             if L1TxMap::get(l1_tx_hash) != 0u8 {
                 return Err(Error::<T>::L1TXExists)?;
             }
 
-            if amount == U256::from(0) {
-                return Err(Error::<T>::InvalidAmount)?;
-            }
+            amount.valid_on_circuit().ok_or(Error::<T>::InvalidAmount)?;
 
             let new_nonce = nonce_check::<T>(&who, nonce)?;
 
@@ -360,14 +400,14 @@ decl_module! {
             command[9..13].copy_from_slice(&account_index.to_be_bytes());
             command[13..17].copy_from_slice(&token_index.to_be_bytes());
             command[17..49].copy_from_slice(&amount.to_be_bytes());
-            command[49..81].copy_from_slice(&l1_tx_hash.to_be_bytes());
+            // command[49..81] is reserved. The l1_tx_hash exceeds field limits, so not in signature.
             let sign = check_sign::<T>(who_account_index, &command, &sign)?;
 
             let req_id = req_id_get::<T>()?;
 
             let new_balance_amount = balance_add::<T>(&account_index, &token_index, amount)?;
 
-            let op = Ops::Deposit(sign.0, sign.1, sign.2, nonce, account_index, token_index, amount, U256::from(0));
+            let op = Ops::Deposit(sign.0, sign.1, sign.2, nonce, account_index, token_index, amount, U256::from(0), who_account_index);
 
             balance_set(&account_index, &token_index, new_balance_amount);
             PendingReqMap::insert(&req_id, op);
@@ -376,7 +416,7 @@ decl_module! {
             DepositMap::insert(&req_id, l1_tx_hash);
             L1TxMap::insert(&l1_tx_hash, PENDING);
 
-            Self::deposit_event(Event::<T>::Deposit(req_id, sign.0, sign.1, sign.2, nonce, account_index, token_index, amount, U256::from(0)));
+            Self::deposit_event(Event::<T>::Deposit(req_id, sign.0, sign.1, sign.2, nonce, account_index, token_index, amount, U256::from(0), who_account_index));
             return Ok(());
         }
 
@@ -392,6 +432,12 @@ decl_module! {
             let who = ensure_signed(origin)?;
             let account = who;
             let account_index = get_account_index::<T>(&account)?;
+
+            if token_index >= MAX_TOKEN_COUNT {
+                return Err(Error::<T>::InvalidTokenIndex)?;
+            }
+
+            amount.valid_on_circuit().ok_or(Error::<T>::InvalidAmount)?;
 
             let req_id = req_id_get::<T>()?;
             let new_nonce = nonce_check::<T>(&account, nonce)?;
@@ -434,6 +480,8 @@ decl_module! {
             let who = ensure_signed(origin)?;
             let account = who;
             let account_index = get_account_index::<T>(&account)?;
+
+            amount.valid_on_circuit().ok_or(Error::<T>::InvalidAmount)?;
 
             let req_id = req_id_get::<T>()?;
             let new_nonce = nonce_check::<T>(&account, nonce)?;
@@ -487,6 +535,9 @@ decl_module! {
             let account = who;
             let account_index = get_account_index::<T>(&account)?;
 
+            amount0.valid_on_circuit().ok_or(Error::<T>::InvalidAmount)?;
+            amount1.valid_on_circuit().ok_or(Error::<T>::InvalidAmount)?;
+
             let (token0, token1, _, _) = PoolMap::get(&pool_index).ok_or(Error::<T>::PoolNotExists)?;
 
             let req_id = req_id_get::<T>()?;
@@ -503,7 +554,7 @@ decl_module! {
 
             let new_balance_from = balance_sub::<T>(&account_index, &token0, amount0)?;
             let new_balance_to = balance_sub::<T>(&account_index, &token1, amount1)?;
-            let new_share = share_add::<T>(&account_index, &pool_index, amount0.checked_add_on_bn128(amount1).ok_or(Error::<T>::ShareOverflow)?)?;
+            let new_share = share_add::<T>(&account_index, &pool_index, amount0.checked_add_on_circuit(amount1).ok_or(Error::<T>::ShareOverflow)?)?;
 
             pool_change::<T>(&pool_index, true, amount0, true, amount1)?;
 
@@ -537,6 +588,9 @@ decl_module! {
             let account = who;
             let account_index = get_account_index::<T>(&account)?;
 
+            amount0.valid_on_circuit().ok_or(Error::<T>::InvalidAmount)?;
+            amount1.valid_on_circuit().ok_or(Error::<T>::InvalidAmount)?;
+
             let (token0, token1, _, _) = PoolMap::get(&pool_index).ok_or(Error::<T>::PoolNotExists)?;
 
             let req_id = req_id_get::<T>()?;
@@ -554,7 +608,7 @@ decl_module! {
             // for user account
             let new_balance_from = balance_add::<T>(&account_index, &token0, amount0)?;
             let new_balance_to = balance_add::<T>(&account_index, &token1, amount1)?;
-            let new_share = share_sub::<T>(&account_index, &pool_index, amount0.checked_add_on_bn128(amount1).ok_or(Error::<T>::ShareNotEnough)?)?;
+            let new_share = share_sub::<T>(&account_index, &pool_index, amount0.checked_add_on_circuit(amount1).ok_or(Error::<T>::ShareNotEnough)?)?;
 
             // for pool
             pool_change::<T>(&pool_index, false, amount0, false, amount1)?;
@@ -786,42 +840,48 @@ decl_module! {
         #[weight = 10_000 + T::DbWeight::get().writes(1)]
         pub fn ack(
             origin,
-            req_id: ReqId
+            req_id_start: ReqId
         ) -> dispatch::DispatchResult {
             let _who = ensure_signed(origin)?;
 
-            PendingReqMap::get(&req_id).ok_or(Error::<T>::InvalidReqId)?;
+            let ack = if _who == T::ADMIN1::get() {
+                ACK1
+            } else {
+                ACK2
+            };
 
-            let mut acks = AckMap::get(&req_id);
+            let batch_size = 10;
 
-            if _who == T::ADMIN1::get() {
-                acks = acks | ACK1;
+            for i in 0..batch_size {
+                let req_id = req_id_start + i + 1;
+
+                PendingReqMap::get(&req_id).ok_or(Error::<T>::InvalidReqId)?;
+
+                let acks = AckMap::get(&req_id) | ack;
+
+                AckMap::insert(&req_id, &acks);
+
+                if acks == NACK {
+                    let l1txhash = DepositMap::get(&req_id);
+                    match l1txhash {
+                        None => {},
+                        Some(v) => {
+                            L1TxMap::insert(v, DONE);
+                        }
+                    };
+                    match PendingReqMap::get(&req_id) {
+                        Some (req) => {
+                            CompleteReqMap::insert(req_id, req);
+                            PendingReqMap::remove(&req_id);
+                        },
+                        _ => {}
+                    };
+                }
             }
 
-            if _who == T::ADMIN2::get() {
-                acks = acks | ACK2;
-            }
+            CompleteReqIndex::set(req_id_start + 10);
 
-            AckMap::insert(&req_id, &acks);
-
-            if acks == NACK {
-                let l1txhash = DepositMap::get(&req_id);
-                match l1txhash {
-                    None => {},
-                    Some(v) => {
-                        L1TxMap::insert(v, DONE);
-                    }
-                };
-                match PendingReqMap::get(&req_id) {
-                    Some (req) => {
-                        CompleteReqMap::insert(req_id, req);
-                        PendingReqMap::remove(&req_id);
-                    },
-                    _ => {}
-                };
-            }
-
-            Self::deposit_event(RawEvent::Ack(req_id, acks));
+            Self::deposit_event(RawEvent::Ack(req_id_start, ack));
             return Ok(());
         }
     }
