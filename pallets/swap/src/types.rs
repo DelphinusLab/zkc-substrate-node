@@ -28,7 +28,7 @@ pub type ReserveU256 = U256;
 #[derive(Encode, Decode, Clone, PartialEq)]
 pub enum Ops {
     SetKey(SignatureRX, SignatureRY, SignatureS, NonceId, AccountIndex, ReserveU32, PublicKeyX, PublicKeyY),
-    Deposit(SignatureRX, SignatureRY, SignatureS, NonceId, AccountIndex, TokenIndex, Amount, ReserveU256),
+    Deposit(SignatureRX, SignatureRY, SignatureS, NonceId, AccountIndex, TokenIndex, Amount, ReserveU256, AccountIndex),
     Withdraw(
         SignatureRX, SignatureRY, SignatureS, NonceId,
         AccountIndex, TokenIndex, Amount, L1Account
@@ -36,7 +36,7 @@ pub enum Ops {
     Swap(SignatureRX, SignatureRY, SignatureS, NonceId, AccountIndex, PoolIndex, Reverse, Amount),
     PoolSupply(SignatureRX, SignatureRY, SignatureS, NonceId, AccountIndex, PoolIndex, Amount, Amount),
     PoolRetrieve(SignatureRX, SignatureRY, SignatureS, NonceId, AccountIndex, PoolIndex, Amount, Amount),
-    AddPool(SignatureRX, SignatureRY, SignatureS, NonceId, TokenIndex, TokenIndex, ReserveU256, ReserveU256, PoolIndex),
+    AddPool(SignatureRX, SignatureRY, SignatureS, NonceId, TokenIndex, TokenIndex, ReserveU256, ReserveU256, PoolIndex, AccountIndex),
     AddNFT(
         SignatureRX, SignatureRY, SignatureS, NonceId,
         NFTId
