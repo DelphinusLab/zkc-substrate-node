@@ -36,6 +36,7 @@ pub enum Ops {
     Swap(SignatureRX, SignatureRY, SignatureS, NonceId, AccountIndex, PoolIndex, Reverse, Amount),
     PoolSupply(SignatureRX, SignatureRY, SignatureS, NonceId, AccountIndex, PoolIndex, Amount, Amount),
     PoolRetrieve(SignatureRX, SignatureRY, SignatureS, NonceId, AccountIndex, PoolIndex, Amount, Amount),
+
     AddPool(SignatureRX, SignatureRY, SignatureS, NonceId, TokenIndex, TokenIndex, ReserveU256, ReserveU256, PoolIndex, AccountIndex),
     AddNFT(
         SignatureRX, SignatureRY, SignatureS, NonceId,

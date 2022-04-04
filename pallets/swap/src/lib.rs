@@ -168,6 +168,35 @@ decl_event!(
             AccountIndex, // To
             NFTId,
         ),
+        DepositNFT(
+            ReqId,
+            SignatureRX,
+            SignatureRY,
+            SignatureS,
+            NonceId,
+            AccountIndex,
+            NFTId
+        ),
+        WithdrawNFT(
+            ReqId,
+            SignatureRX,
+            SignatureRY,
+            SignatureS,
+            NonceId,
+            AccountIndex,
+            NFTId,
+            L1Account,
+        ),
+        TransferNFT(
+            ReqId,
+            SignatureRX,
+            SignatureRY,
+            SignatureS,
+            NonceId,
+            AccountIndex, // From
+            AccountIndex, // To
+            NFTId,
+        ),
         Ack(ReqId, u8),
         Abort(ReqId),
         RewardFunds(AccountId, Balance, BlockNumber),
