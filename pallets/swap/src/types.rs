@@ -43,7 +43,7 @@ pub enum Ops {
     ),
     DepositNFT(
         SignatureRX, SignatureRY, SignatureS, NonceId,
-        AccountIndex, NFTId
+        AccountIndex, NFTId, AccountIndex
     ),
     WithdrawNFT(
         SignatureRX, SignatureRY, SignatureS, NonceId,
@@ -51,6 +51,15 @@ pub enum Ops {
     ),
     TransferNFT(
         SignatureRX, SignatureRY, SignatureS, NonceId,
-        AccountIndex, AccountIndex, NFTId
+        AccountIndex, NFTId, AccountIndex
     ),
+    BidNFT(
+        SignatureRX, SignatureRY, SignatureS, NonceId,
+        AccountIndex, NFTId, Amount
+    ),
+    FinalizeNFT(
+        SignatureRX, SignatureRY, SignatureS, NonceId,
+        AccountIndex, NFTId
+
+    )
 }

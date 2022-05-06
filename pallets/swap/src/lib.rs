@@ -20,6 +20,9 @@ use types::*;
 #[cfg(test)]
 mod mock;
 
+#[cfg(test)]
+mod tests;
+
 pub trait Config: frame_system::Config {
     type Currency: Currency<Self::AccountId> + ReservableCurrency<Self::AccountId>;
     type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
@@ -37,8 +40,10 @@ const PENDING: u8 = 1u8;
 const DONE: u8 = 2u8;
 
 const MAX_ACCOUNT_COUNT: u32 = 1u32 << 20;
+const MAX_NFTINDEX_COUNT: u32 = 1u32 << 20;
 const MAX_TOKEN_COUNT: u32 = 1u32 << 10;
 const MAX_POOL_COUNT: u32 = 1u32 << 10;
+const NFT_TOKEN_INDEX: u32 = 1u32;
 
 const OP_DEPOSIT: u8 = 0u8;
 const OP_WITHDRAW: u8 = 1u8;
@@ -49,8 +54,9 @@ const OP_ADDPOOL: u8 = 5u8;
 const OP_SETKEY: u8 = 6u8;
 const OP_DEPOSIT_NFT: u8 = 7u8;
 const OP_WITHDRAW_NFT: u8 = 8u8;
-const OP_TRANSFER: u8 = 9u8;
-const OP_TRANSFER_NFT: u8 = 10u8;
+const OP_TRANSFER_NFT: u8 = 9u8;
+const OP_BID_NFT: u8 = 10u8;
+const OP_FINALIZE_NFT: u8 = 11u8;
 
 decl_event!(
     pub enum Event<T>
@@ -146,7 +152,8 @@ decl_event!(
             SignatureS,
             NonceId,
             AccountIndex,
-            NFTId
+            NFTId,
+            AccountIndex
         ),
         WithdrawNFT(
             ReqId,
@@ -168,7 +175,17 @@ decl_event!(
             AccountIndex, // To
             NFTId,
         ),
-        DepositNFT(
+        BidNFT(
+            ReqId,
+            SignatureRX,
+            SignatureRY,
+            SignatureS,
+            NonceId,
+            AccountIndex,
+            NFTId,
+            Amount
+        ),
+        FinalizeNFT(
             ReqId,
             SignatureRX,
             SignatureRY,
@@ -176,26 +193,6 @@ decl_event!(
             NonceId,
             AccountIndex,
             NFTId
-        ),
-        WithdrawNFT(
-            ReqId,
-            SignatureRX,
-            SignatureRY,
-            SignatureS,
-            NonceId,
-            AccountIndex,
-            NFTId,
-            L1Account,
-        ),
-        TransferNFT(
-            ReqId,
-            SignatureRX,
-            SignatureRY,
-            SignatureS,
-            NonceId,
-            AccountIndex, // From
-            AccountIndex, // To
-            NFTId,
         ),
         Ack(ReqId, u8),
         Abort(ReqId),
@@ -358,7 +355,6 @@ decl_module! {
             if account_index >= AccountIndexCount::get() {
                 return Err(Error::<T>::InvalidAccount)?;
             }
-
 
             if L1TxMap::get(l1_tx_hash) != 0u8 {
                 return Err(Error::<T>::L1TXExists)?;
@@ -616,7 +612,11 @@ decl_module! {
             nonce: NonceId
         ) -> dispatch::DispatchResult {
             let who = ensure_signed(origin)?;
-            let who_account_index = get_account_index::<T>(&who)?;
+            let caller_account_index = get_account_index::<T>(&who)?;
+
+            validation_account_index::<T>(account_index)?;
+
+            validation_nft_index::<T>(nft_id)?;
 
             if L1TxMap::get(l1_tx_hash) != 0u8 {
                 return Err(Error::<T>::L1TXExists)?;
@@ -630,12 +630,12 @@ decl_module! {
             command[9..13].copy_from_slice(&account_index.to_be_bytes());
             command[13..17].copy_from_slice(&nft_id.to_be_bytes());
             command[17..49].copy_from_slice(&l1_tx_hash.to_be_bytes());
-            let sign = check_sign::<T>(who_account_index, &command, &sign)?;
+            let sign = check_sign::<T>(caller_account_index, &command, &sign)?;
 
             let req_id = req_id_get::<T>()?;
 
-            let new_balance_amount = nft_add::<T>(&account_index, &nft_id)?;
-            let op = Ops::DepositNFT(sign.0, sign.1, sign.2, nonce, account_index, nft_id);
+            nft_add::<T>(&account_index, &nft_id)?;
+            let op = Ops::DepositNFT(sign.0, sign.1, sign.2, nonce, account_index, nft_id, caller_account_index);
 
             PendingReqMap::insert(&req_id, op);
             ReqIndex::put(req_id);
@@ -643,7 +643,8 @@ decl_module! {
             DepositMap::insert(&req_id, l1_tx_hash);
             L1TxMap::insert(&l1_tx_hash, PENDING);
 
-            Self::deposit_event(Event::<T>::DepositNFT(req_id, sign.0, sign.1, sign.2, nonce, account_index, nft_id));
+            Self::deposit_event(Event::<T>::DepositNFT(req_id, sign.0, sign.1, sign.2, nonce, account_index, nft_id, caller_account_index));
+
             return Ok(());
         }
 
@@ -656,32 +657,32 @@ decl_module! {
             nonce: NonceId
         ) -> dispatch::DispatchResult {
             let who = ensure_signed(origin)?;
-            let account = who;
-            let account_index = get_account_index::<T>(&account)?;
+            let account_index = get_account_index::<T>(&who)?;
 
-            let req_id = req_id_get::<T>()?;
+            validation_nft_index::<T>(nft_id)?;
+
             l1account_check::<T>(l1account)?;
-            let new_nonce = nonce_check::<T>(&account, nonce)?;
+
+            let new_nonce = nonce_check::<T>(&who, nonce)?;
 
             let mut command = [0u8; 81];
-            command[0] = OP_WITHDRAW;
+            command[0] = OP_WITHDRAW_NFT;
             command[1..9].copy_from_slice(&nonce.to_be_bytes());
             command[9..13].copy_from_slice(&account_index.to_be_bytes());
             command[13..17].copy_from_slice(&nft_id.to_be_bytes());
             command[17..49].copy_from_slice(&l1account.to_be_bytes());
             let sign = check_sign::<T>(account_index, &command, &sign)?;
 
+            let req_id = req_id_get::<T>()?;
+
+            nft_withdraw::<T>(&account_index, &nft_id)?;
             let op = Ops::WithdrawNFT(sign.0, sign.1, sign.2, nonce, account_index, nft_id, l1account);
+
             PendingReqMap::insert(&req_id, op);
             ReqIndex::put(req_id);
+            NonceMap::<T>::insert(&who, new_nonce);
 
-            nft_widthdraw::<T>(&account_index, &nft_id);
-            NonceMap::<T>::insert(&account, new_nonce);
-
-            Self::deposit_event(Event::<T>::WithdrawNFT(
-                req_id,
-                sign.0, sign.1, sign.2, nonce, account_index, nft_id, l1account
-            ));
+            Self::deposit_event(Event::<T>::WithdrawNFT(req_id, sign.0, sign.1, sign.2, nonce, account_index, nft_id, l1account));
 
             return Ok(());
         }
@@ -691,42 +692,118 @@ decl_module! {
             origin,
             sign: [u8; 64],
             nft_id: NFTId,
-            recipent: AccountIndex,
+            recipient: AccountIndex,
             nonce: NonceId
         ) -> dispatch::DispatchResult {
             let who = ensure_signed(origin)?;
-            let account = who;
-            let account_index = get_account_index::<T>(&account)?;
+            let account_index = get_account_index::<T>(&who)?;
 
-            let req_id = req_id_get::<T>()?;
-            if recipent >= AccountIndexCount::get() {
-                return Err(Error::<T>::InvalidAccount)?;
-            }
-            let new_nonce = nonce_check::<T>(&account, nonce)?;
+            validation_nft_index::<T>(nft_id)?;
 
+            validation_account_index::<T>(recipient)?;
+
+            let new_nonce = nonce_check::<T>(&who, nonce)?;
+
+            let mut pad_recipient = [0u8; 32];
+            pad_recipient[28..].copy_from_slice(&recipient.to_be_bytes());
             let mut command = [0u8; 81];
-            command[0] = OP_WITHDRAW;
+            command[0] = OP_TRANSFER_NFT;
             command[1..9].copy_from_slice(&nonce.to_be_bytes());
             command[9..13].copy_from_slice(&account_index.to_be_bytes());
             command[13..17].copy_from_slice(&nft_id.to_be_bytes());
-            command[17..21].copy_from_slice(&recipent.to_be_bytes());
+            command[17..49].copy_from_slice(&pad_recipient);
             let sign = check_sign::<T>(account_index, &command, &sign)?;
 
-            let op = Ops::TransferNFT(sign.0, sign.1, sign.2, nonce, account_index, recipent, nft_id);
+            let req_id = req_id_get::<T>()?;
+
+            nft_transfer::<T>(&account_index, &recipient, &nft_id)?;
+            let op = Ops::TransferNFT(sign.0, sign.1, sign.2, nonce, account_index, nft_id, recipient);
+
             PendingReqMap::insert(&req_id, op);
             ReqIndex::put(req_id);
+            NonceMap::<T>::insert(&who, new_nonce);
 
-            nft_transfer::<T>(&account_index, &recipent, &nft_id);
-            NonceMap::<T>::insert(&account, new_nonce);
-
-            Self::deposit_event(Event::<T>::TransferNFT(
-                req_id,
-                sign.0, sign.1, sign.2, nonce, account_index, recipent, nft_id
-            ));
+            Self::deposit_event(Event::<T>::TransferNFT(req_id, sign.0, sign.1, sign.2, nonce, account_index, recipient, nft_id));
 
             return Ok(());
         }
 
+        #[weight = 10_000 + T::DbWeight::get().writes(1)]
+        pub fn bid_nft(
+            origin,
+            sign: [u8; 64],
+            nft_id: NFTId,
+            amount: Amount,
+            nonce: NonceId
+        ) -> dispatch::DispatchResult {
+            let who = ensure_signed(origin)?;
+            let account_index = get_account_index::<T>(&who)?;
+
+            validation_nft_index::<T>(nft_id)?;
+
+            amount.valid_on_circuit().ok_or(Error::<T>::InvalidAmount)?;
+            let nft = NFTMap::get(&nft_id);
+            if amount <= nft.1 {
+                return Err(Error::<T>::InvalidAmount)?;
+            }
+
+            let new_nonce = nonce_check::<T>(&who, nonce)?;
+
+            let mut command = [0u8; 81];
+            command[0] = OP_BID_NFT;
+            command[1..9].copy_from_slice(&nonce.to_be_bytes());
+            command[9..13].copy_from_slice(&account_index.to_be_bytes());
+            command[13..17].copy_from_slice(&nft_id.to_be_bytes());
+            command[17..49].copy_from_slice(&amount.to_be_bytes());
+            let sign = check_sign::<T>(account_index, &command, &sign)?;
+
+            let req_id = req_id_get::<T>()?;
+
+            nft_bid::<T>(&account_index, amount, &nft_id)?;
+            let op = Ops::BidNFT(sign.0, sign.1, sign.2, nonce, account_index, nft_id, amount);
+            PendingReqMap::insert(&req_id, op);
+            ReqIndex::put(req_id);
+            NonceMap::<T>::insert(&who, new_nonce);
+
+            Self::deposit_event(Event::<T>::BidNFT(req_id, sign.0, sign.1, sign.2, nonce, account_index, nft_id, amount));
+
+            return Ok(());
+        }
+
+        #[weight = 10_000 + T::DbWeight::get().writes(1)]
+        pub fn finalize_nft(
+            origin,
+            sign: [u8; 64],
+            nft_id: NFTId,
+            nonce: NonceId
+        ) -> dispatch::DispatchResult {
+            let who = ensure_signed(origin)?;
+            let account_index = get_account_index::<T>(&who)?;
+
+            validation_nft_index::<T>(nft_id)?;
+
+            let new_nonce = nonce_check::<T>(&who, nonce)?;
+
+            let mut command = [0u8; 81];
+            command[0] = OP_FINALIZE_NFT;
+            command[1..9].copy_from_slice(&nonce.to_be_bytes());
+            command[9..13].copy_from_slice(&account_index.to_be_bytes());
+            command[13..17].copy_from_slice(&nft_id.to_be_bytes());
+            let sign = check_sign::<T>(account_index, &command, &sign)?;
+
+            let req_id = req_id_get::<T>()?;
+
+            nft_finalize::<T>(&account_index, &nft_id)?;
+            let op = Ops::FinalizeNFT(sign.0, sign.1, sign.2, nonce, account_index, nft_id);
+
+            PendingReqMap::insert(&req_id, op);
+            ReqIndex::put(req_id);
+            NonceMap::<T>::insert(&who, new_nonce);
+
+            Self::deposit_event(Event::<T>::FinalizeNFT(req_id, sign.0, sign.1, sign.2, nonce, account_index, nft_id));
+
+            return Ok(());
+        }
 
         #[weight = 10_000 + T::DbWeight::get().writes(1)]
         pub fn ack(

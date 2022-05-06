@@ -36,6 +36,8 @@ decl_error! {
         InvalidAmount,
         InvalidKey,
         InvalidSignature,
-        InvalidAccount
+        InvalidAccount,
+        IsNotOwner,
+        InvalidNFTIndex
     }
 }
