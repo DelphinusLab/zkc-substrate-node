@@ -6,6 +6,7 @@ use delphinus_crypto::{BabyJubjub, BabyJubjubField, BabyJubjubPoint, Curve, Prim
 use frame_support::traits::{Currency, ReservableCurrency};
 use frame_support::{decl_event, decl_module, decl_storage, dispatch, traits::Get};
 use frame_system::ensure_signed;
+use frame_support::traits::Vec;
 use num_bigint::{BigInt, Sign};
 use sp_core::U256;
 
@@ -23,16 +24,12 @@ mod mock;
 pub trait Config: frame_system::Config {
     type Currency: Currency<Self::AccountId> + ReservableCurrency<Self::AccountId>;
     type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
-    type ADMIN1: Get<<Self as frame_system::Config>::AccountId>;
-    type ADMIN2: Get<<Self as frame_system::Config>::AccountId>;
+    type AckAdmins: Get<Vec<<Self as frame_system::Config>::AccountId>>;
 }
 
 type BalanceOf<T> =
     <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 
-const ACK1: u8 = 1u8;
-const ACK2: u8 = 2u8;
-const NACK: u8 = ACK1 | ACK2;
 const PENDING: u8 = 1u8;
 const DONE: u8 = 2u8;
 
@@ -545,24 +542,23 @@ decl_module! {
         ) -> dispatch::DispatchResult {
             let _who = ensure_signed(origin)?;
 
-            let ack = if _who == T::ADMIN1::get() {
-                ACK1
-            } else {
-                ACK2
-            };
+            let nack = (1u8 << T::AckAdmins::get().len()) - 1;
 
-            let batch_size = 10;
+            let ack = T::AckAdmins::get().iter().position(|x| x.clone() == _who).ok_or(Error::<T>::NoAccess)?;
+            let ack_bits = 1u8 << ack;
+
+            let batch_size = 10 as u32;
 
             for i in 0..batch_size {
-                let req_id = req_id_start + i + 1;
+                let req_id = req_id_start + U256::from(i + 1);
 
                 PendingReqMap::get(&req_id).ok_or(Error::<T>::InvalidReqId)?;
 
-                let acks = AckMap::get(&req_id) | ack;
+                let acks = AckMap::get(&req_id) | ack_bits;
 
                 AckMap::insert(&req_id, &acks);
 
-                if acks == NACK {
+                if acks == nack {
                     let l1txhash = DepositMap::get(&req_id);
                     match l1txhash {
                         None => {},
@@ -580,9 +576,8 @@ decl_module! {
                 }
             }
 
-            CompleteReqIndex::set(req_id_start + 10);
-
-            Self::deposit_event(RawEvent::Ack(req_id_start, ack));
+            CompleteReqIndex::set(req_id_start + U256::from(10 as u32));
+            Self::deposit_event(RawEvent::Ack(req_id_start, ack_bits));
             return Ok(());
         }
     }
