@@ -163,6 +163,123 @@ pub fn share_sub<T: Config>(
     return Ok(new_amount);
 }
 
+/* --- NFT --- */
+
+trait NFTData<T: Config> {
+    fn checked_empty(&self) -> Result<(), Error<T>>;
+    fn checked_owner(&self, account_index: &AccountIndex) -> Result<(), Error<T>>;
+}
+
+impl<T:Config> NFTData<T> for (AccountIndex, Amount, Option<AccountIndex>) {
+    fn checked_empty(&self) -> Result<(), Error<T>> {
+        if self.0 != 0u32 {
+            return Err(Error::<T>::InvalidNFTIndex);
+        } else {
+            return Ok(());
+        }
+    }
+
+    fn checked_owner(&self, account_index: &AccountIndex) -> Result<(), Error<T>> {
+        if self.0 != *account_index {
+            return Err(Error::<T>::IsNotOwner);
+        } else {
+            return Ok(());
+        }
+    }
+}
+
+pub fn nft_add<T: Config>(
+    account_index: &AccountIndex,
+    nft_id: &NFTId,
+) -> Result<(), Error<T>> {
+    let nft = NFTMap::get(&nft_id);
+    nft.checked_empty()?;
+    let bidder: Option<AccountIndex> = None;
+    NFTMap::insert(nft_id, (account_index, U256::from(0), bidder));
+    return Ok(());
+}
+
+pub fn nft_withdraw<T: Config>(
+    account_index: &AccountIndex,
+    nft_id: &NFTId,
+) -> Result<(), Error<T>> {
+    let nft = NFTMap::get(&nft_id);
+    nft.checked_owner(account_index)?;
+    if nft.2 != None {
+        let new_balance_amount = balance_add::<T>(&nft.2.unwrap(), &NFT_TOKEN_INDEX, nft.1)?;
+        balance_set(&nft.2.unwrap(), &NFT_TOKEN_INDEX, new_balance_amount);
+    }
+    let bidder: Option<AccountIndex> = None;
+    NFTMap::insert(nft_id, (0, U256::from(0), bidder));
+    return Ok(());
+}
+
+pub fn nft_transfer<T: Config>(
+    from_index: &AccountIndex,
+    to_index: &AccountIndex,
+    nft_id: &NFTId,
+) -> Result<(), Error<T>> {
+    let nft = NFTMap::get(&nft_id);
+    nft.checked_owner(from_index)?;
+
+    NFTMap::insert(nft_id, (to_index, nft.1, nft.2));
+    return Ok(());
+}
+
+pub fn nft_bid<T: Config>(
+    bidder: &AccountIndex,
+    amount: Amount,
+    nft_id: &NFTId,
+) -> Result<(), Error<T>> {
+    let nft = NFTMap::get(&nft_id);
+    if nft.0 == 0u32 {
+        return Err(Error::<T>::InvalidNFTIndex);
+    }
+    if nft.2 != None {
+        let new_balance_amount0 = balance_add::<T>(&nft.2.unwrap(), &NFT_TOKEN_INDEX, nft.1)?;
+        let new_balance_amount1 = balance_sub::<T>(bidder, &NFT_TOKEN_INDEX, amount)?;
+        balance_set(&nft.2.unwrap(), &NFT_TOKEN_INDEX, new_balance_amount0);
+        balance_set(bidder, &NFT_TOKEN_INDEX, new_balance_amount1);
+    } else {
+        let new_balance_amount1 = balance_sub::<T>(bidder, &NFT_TOKEN_INDEX, amount)?;
+        balance_set(bidder, &NFT_TOKEN_INDEX, new_balance_amount1);
+
+    }
+    let bidder: Option<&AccountIndex> = Some(bidder);
+    NFTMap::insert(nft_id, (nft.0, amount, bidder));
+    return Ok(());
+}
+
+pub fn nft_finalize<T: Config>(
+    account_index: &AccountIndex,
+    nft_id: &NFTId,
+) -> Result<(), Error<T>> {
+    let nft = NFTMap::get(&nft_id);
+    if nft.2 == None {
+        return Err(Error::<T>::InvalidNFTIndex);
+    }
+    nft.checked_owner(account_index)?;
+    let new_balance_amount = balance_add::<T>(account_index, &NFT_TOKEN_INDEX, nft.1)?;
+    balance_set(account_index, &NFT_TOKEN_INDEX, new_balance_amount);
+    let bidder: Option<AccountIndex> = None;
+    NFTMap::insert(nft_id, (nft.2.unwrap(), U256::from(0u8), bidder));
+    return Ok(());
+}
+
+pub fn validation_account_index<T: Config>(account_index: AccountIndex) -> Result<(), Error<T>> {
+    if account_index >= AccountIndexCount::get() || account_index == 0u32 {
+        return Err(Error::<T>::InvalidAccount);
+    }
+    return Ok(());
+}
+
+pub fn validation_nft_index<T: Config>(nft_id: NFTId) -> Result<(), Error<T>> {
+    if nft_id >= MAX_NFTINDEX_COUNT || nft_id == 0u32 {
+        return Err(Error::<T>::InvalidNFTIndex);
+    }
+    return Ok(());
+}
+
 pub fn req_id_get<T: Config>() -> Result<ReqId, Error<T>> {
     let req_id = ReqIndex::get()
         .checked_add_on_circuit(U256::from(1))
@@ -225,6 +342,7 @@ fn _check_sign<T: Config>(data: &[u8], sign: Signature, key: PublicKey) -> Resul
         x: BabyJubjubField::new(&u256_to_bigint(&key.0)),
         y: BabyJubjubField::new(&u256_to_bigint(&key.1)),
     };
+
     if BabyJubjub::verify(data, s, k) {
         Ok(())
     } else {

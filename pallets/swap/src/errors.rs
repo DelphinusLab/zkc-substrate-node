@@ -6,6 +6,7 @@ decl_error! {
         NoneValue,
         BalanceOverflow,
         BalanceNotEnough,
+        NFTNoAuthority,
         LockedBalanceOverflow,
         LockedBalanceNotEnough,
         PoolBalanceNotEnough,
@@ -35,6 +36,8 @@ decl_error! {
         InvalidAmount,
         InvalidKey,
         InvalidSignature,
-        InvalidAccount
+        InvalidAccount,
+        IsNotOwner,
+        InvalidNFTIndex
     }
 }
