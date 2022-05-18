@@ -43,8 +43,6 @@ frame_support::construct_runtime!(
 parameter_types! {
     pub const BlockHashCount: u64 = 250;
     pub const SS58Prefix: u8 = 42;
-    pub const ADMIN1: u8 = 1;
-    pub const ADMIN2: u8 = 2;
 }
 
 impl system::Config for Test {
@@ -72,11 +70,18 @@ impl system::Config for Test {
     type SS58Prefix = SS58Prefix;
 }
 
+fn admins() -> Vec<u64> {
+    vec![1u64, 2u64]
+}
+
+parameter_types! {
+    pub AckAdmins: Vec<u64> = admins();
+}
+
 impl swap::Config for Test {
     type Currency = Balances;
     type Event = Event;
-    type ADMIN1 = ADMIN1;
-    type ADMIN2 = ADMIN2;
+    type AckAdmins = AckAdmins;
 }
 
 // Build genesis storage according to the mock runtime.
