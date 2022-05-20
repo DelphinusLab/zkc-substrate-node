@@ -72,6 +72,7 @@ pub fn create_pool_index<T: Config>(
             token_dst_index.clone(),
             U256::from(0),
             U256::from(0),
+            U256::exp10(ORDER_OF_MAGNITUDE)
         ),
     );
     return Ok(index);
@@ -113,7 +114,7 @@ pub fn pool_change<T: Config>(
     is_add_1: bool,
     change_1: Amount,
 ) -> Result<(Amount, Amount), Error<T>> {
-    let (token_index_0, token_index_1, amount_0, amount_1) =
+    let (token_index_0, token_index_1, amount_0, amount_1, k) =
         PoolMap::get(pool_index).ok_or(Error::<T>::PoolNotExists)?;
     let new_amount_0 = if is_add_0 {
         amount_0
@@ -135,7 +136,42 @@ pub fn pool_change<T: Config>(
     };
     PoolMap::insert(
         pool_index,
-        (token_index_0, token_index_1, new_amount_0, new_amount_1),
+        (token_index_0, token_index_1, new_amount_0, new_amount_1, k)
+    );
+    return Ok((new_amount_0, new_amount_1));
+}
+
+pub fn pool_change_with_k<T: Config>(
+    pool_index: &PoolIndex,
+    is_add_0: bool,
+    change_0: Amount,
+    is_add_1: bool,
+    change_1: Amount,
+    k_new: Amount
+) -> Result<(Amount, Amount), Error<T>> {
+    let (token_index_0, token_index_1, amount_0, amount_1, _) =
+        PoolMap::get(pool_index).ok_or(Error::<T>::PoolNotExists)?;
+    let new_amount_0 = if is_add_0 {
+        amount_0
+            .checked_add_on_circuit(change_0)
+            .ok_or(Error::<T>::PoolBalanceOverflow)?
+    } else {
+        amount_0
+            .checked_sub(change_0)
+            .ok_or(Error::<T>::PoolBalanceNotEnough)?
+    };
+    let new_amount_1 = if is_add_1 {
+        amount_1
+            .checked_add_on_circuit(change_1)
+            .ok_or(Error::<T>::PoolBalanceOverflow)?
+    } else {
+        amount_1
+            .checked_sub(change_1)
+            .ok_or(Error::<T>::PoolBalanceNotEnough)?
+    };
+    PoolMap::insert(
+        pool_index,
+        (token_index_0, token_index_1, new_amount_0, new_amount_1, k_new)
     );
     return Ok((new_amount_0, new_amount_1));
 }
@@ -163,6 +199,47 @@ pub fn share_sub<T: Config>(
     return Ok(new_amount);
 }
 
+pub fn get_new_share<T: Config>(
+    account_index: &AccountIndex,
+    pool_index: &PoolIndex,
+    amount: Amount,
+    is_supply: bool
+) -> Result<Amount, Error<T>>{
+    let share_old = ShareMap::get((account_index, pool_index));
+    let (_, _, _, _, k) = PoolMap::get(pool_index).ok_or(Error::<T>::PoolNotExists)?;
+    let share_new = if is_supply {
+        amount * (k - 1) + share_old
+    } else {
+        share_old - amount * k
+    };
+    return Ok(share_new);
+}
+
+pub fn get_swap_amount<T: Config>(
+    amount: Amount
+) -> Result<Amount, Error<T>> {
+    let swap_amount = amount - U256::from((amount * SERVICE_CHARGE).as_u128().overflowing_div(1000).0 + 1_u128);
+    return Ok(swap_amount);
+}
+
+pub fn calculate_new_k<T: Config>(
+    pool_index: &PoolIndex,
+    amount: Amount
+) -> Result<Amount, Error<T>> {
+    let (_, _, amount_0, amount_1, k) = PoolMap::get(pool_index).ok_or(Error::<T>::PoolNotExists)?;
+    let k_new = U256::from(((amount_0 + amount_1) * k).as_u128().overflowing_div((amount_0 + amount_1 + amount).as_u128()).0 + 1);
+    return Ok(k_new);
+}
+
+pub fn valid_pool_amount(
+    amount: Amount
+) -> Option<U256> {
+    let maximum = U256::from(1u64) << 125;
+    match amount >= maximum {
+        true => None,
+        false => Some(amount),
+    }
+}
 /* --- NFT --- */
 
 trait NFTData<T: Config> {
