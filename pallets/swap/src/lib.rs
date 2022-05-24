@@ -623,6 +623,8 @@ decl_module! {
             nonce: NonceId
         ) -> dispatch::DispatchResult {
             let who = ensure_signed(origin)?;
+            is_admin::<T>(&who)?;
+
             let caller_account_index = get_account_index::<T>(&who)?;
 
             validation_account_index::<T>(account_index)?;
