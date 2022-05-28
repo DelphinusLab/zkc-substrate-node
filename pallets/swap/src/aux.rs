@@ -148,7 +148,7 @@ pub fn pool_change_with_k<T: Config>(
     is_add_1: bool,
     change_1: Amount,
     k_new: Amount
-) -> Result<(Amount, Amount), Error<T>> {
+) -> Result<(Amount, Amount, Amount), Error<T>> {
     let (token_index_0, token_index_1, amount_0, amount_1, _) =
         PoolMap::get(pool_index).ok_or(Error::<T>::PoolNotExists)?;
     let new_amount_0 = if is_add_0 {
@@ -173,7 +173,7 @@ pub fn pool_change_with_k<T: Config>(
         pool_index,
         (token_index_0, token_index_1, new_amount_0, new_amount_1, k_new)
     );
-    return Ok((new_amount_0, new_amount_1));
+    return Ok((new_amount_0, new_amount_1, k_new));
 }
 
 /* ---- Share ---- */
@@ -199,27 +199,40 @@ pub fn share_sub<T: Config>(
     return Ok(new_amount);
 }
 
-pub fn get_new_share<T: Config>(
-    account_index: &AccountIndex,
+pub fn get_share_change<T: Config>(
     pool_index: &PoolIndex,
     amount: Amount,
     is_supply: bool
 ) -> Result<Amount, Error<T>>{
-    let share_old = ShareMap::get((account_index, pool_index));
     let (_, _, _, _, k) = PoolMap::get(pool_index).ok_or(Error::<T>::PoolNotExists)?;
+
+    valid_pool_amount(amount).ok_or(Error::<T>::InvalidAmount)?;
+
     let share_new = if is_supply {
-        amount * (k - 1) + share_old
+        amount * (k - 1)
     } else {
-        share_old - amount * k
+        amount * k
     };
     return Ok(share_new);
 }
 
-pub fn get_swap_amount<T: Config>(
+pub fn calculate_swap_result_amount<T: Config>(
+    amount_input: Amount,
+    amount_output: Amount,
     amount: Amount
 ) -> Result<Amount, Error<T>> {
-    let swap_amount = amount - U256::from((amount * SERVICE_CHARGE).as_u128().overflowing_div(1000).0 + 1_u128);
-    return Ok(swap_amount);
+    valid_pool_amount(amount_input).ok_or(Error::<T>::InvalidAmount)?;
+    if amount_input == U256::from(0) {
+        return Err(Error::<T>::InvalidAmount);
+    }
+    valid_pool_amount(amount_output).ok_or(Error::<T>::InvalidAmount)?;
+    valid_pool_amount(amount).ok_or(Error::<T>::InvalidAmount)?;
+
+    // swap rate is almost equal to 0.3%(1021/1024 for convenience in circom)
+    let dividend: Amount = amount_output * amount * 1021;
+    let divisor: Amount = (amount_input + amount) * 1024;
+    let result_amount = dividend.checked_div(divisor).unwrap();
+    return Ok(result_amount);
 }
 
 pub fn calculate_new_k<T: Config>(
@@ -227,7 +240,19 @@ pub fn calculate_new_k<T: Config>(
     amount: Amount
 ) -> Result<Amount, Error<T>> {
     let (_, _, amount_0, amount_1, k) = PoolMap::get(pool_index).ok_or(Error::<T>::PoolNotExists)?;
-    let k_new = U256::from(((amount_0 + amount_1) * k).as_u128().overflowing_div((amount_0 + amount_1 + amount).as_u128()).0 + 1);
+
+    valid_pool_amount(amount).ok_or(Error::<T>::InvalidAmount)?;
+
+    let total_old = amount_0 + amount_1;
+    let total_new = total_old + amount;
+    let dividend = total_old * k;
+    let remainder = dividend.checked_rem(total_new).unwrap();
+    let quotient = dividend.checked_div(total_new).unwrap();
+    let k_new = if remainder == U256::from(0) {
+        quotient
+    } else {
+        quotient + 1
+    };
     return Ok(k_new);
 }
 
@@ -240,6 +265,7 @@ pub fn valid_pool_amount(
         false => Some(amount),
     }
 }
+
 /* --- NFT --- */
 
 trait NFTData<T: Config> {
