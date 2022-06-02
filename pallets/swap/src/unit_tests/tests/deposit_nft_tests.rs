@@ -112,7 +112,7 @@ fn deposit_nft_noaccess() {
 
         assert_ok!(SwapModule::deposit(Origin::signed(origin), command_sign_formatted, account_index, token_index, amount, l1_tx_hash, nonce));
 
-        //DepositNFT for accountIndex 2, caller is accountIndex 1
+        //DepositNFT for accountIndex 2, caller is accountIndex 0
         //origin 0u64 is not admin
         origin = 0u64;
         let nft_id = 4u32;
@@ -126,7 +126,7 @@ fn deposit_nft_noaccess() {
         command[13..17].copy_from_slice(&nft_id.to_be_bytes());
         command[17..49].copy_from_slice(&l1_tx_hash.to_be_bytes());
 
-        command_sign = BabyJubjub::sign(&command, &secret_key_1);
+        command_sign = BabyJubjub::sign(&command, &secret_key_0);
         command_sign_formatted = [0 as u8;64];
         command_sign_formatted[..32].copy_from_slice(&command_sign.r.encode());
         command_sign_formatted[32..].copy_from_slice(&command_sign.s.encode());

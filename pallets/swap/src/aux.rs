@@ -72,6 +72,7 @@ pub fn create_pool_index<T: Config>(
             token_dst_index.clone(),
             U256::from(0),
             U256::from(0),
+            U256::exp10(ORDER_OF_MAGNITUDE)
         ),
     );
     return Ok(index);
@@ -113,7 +114,7 @@ pub fn pool_change<T: Config>(
     is_add_1: bool,
     change_1: Amount,
 ) -> Result<(Amount, Amount), Error<T>> {
-    let (token_index_0, token_index_1, amount_0, amount_1) =
+    let (token_index_0, token_index_1, amount_0, amount_1, k) =
         PoolMap::get(pool_index).ok_or(Error::<T>::PoolNotExists)?;
     let new_amount_0 = if is_add_0 {
         amount_0
@@ -135,9 +136,44 @@ pub fn pool_change<T: Config>(
     };
     PoolMap::insert(
         pool_index,
-        (token_index_0, token_index_1, new_amount_0, new_amount_1),
+        (token_index_0, token_index_1, new_amount_0, new_amount_1, k)
     );
     return Ok((new_amount_0, new_amount_1));
+}
+
+pub fn pool_change_with_k<T: Config>(
+    pool_index: &PoolIndex,
+    is_add_0: bool,
+    change_0: Amount,
+    is_add_1: bool,
+    change_1: Amount,
+    k_new: Amount
+) -> Result<(Amount, Amount, Amount), Error<T>> {
+    let (token_index_0, token_index_1, amount_0, amount_1, _) =
+        PoolMap::get(pool_index).ok_or(Error::<T>::PoolNotExists)?;
+    let new_amount_0 = if is_add_0 {
+        amount_0
+            .checked_add_on_circuit(change_0)
+            .ok_or(Error::<T>::PoolBalanceOverflow)?
+    } else {
+        amount_0
+            .checked_sub(change_0)
+            .ok_or(Error::<T>::PoolBalanceNotEnough)?
+    };
+    let new_amount_1 = if is_add_1 {
+        amount_1
+            .checked_add_on_circuit(change_1)
+            .ok_or(Error::<T>::PoolBalanceOverflow)?
+    } else {
+        amount_1
+            .checked_sub(change_1)
+            .ok_or(Error::<T>::PoolBalanceNotEnough)?
+    };
+    PoolMap::insert(
+        pool_index,
+        (token_index_0, token_index_1, new_amount_0, new_amount_1, k_new)
+    );
+    return Ok((new_amount_0, new_amount_1, k_new));
 }
 
 /* ---- Share ---- */
@@ -161,6 +197,73 @@ pub fn share_sub<T: Config>(
         .checked_sub(amount)
         .ok_or(Error::<T>::ShareNotEnough)?;
     return Ok(new_amount);
+}
+
+pub fn get_share_change<T: Config>(
+    pool_index: &PoolIndex,
+    amount: Amount,
+    is_supply: bool
+) -> Result<Amount, Error<T>>{
+    let (_, _, _, _, k) = PoolMap::get(pool_index).ok_or(Error::<T>::PoolNotExists)?;
+
+    valid_pool_amount(amount).ok_or(Error::<T>::InvalidAmount)?;
+
+    let share_new = if is_supply {
+        amount * (k - 1)
+    } else {
+        amount * k
+    };
+    return Ok(share_new);
+}
+
+pub fn calculate_swap_result_amount<T: Config>(
+    amount_input: Amount,
+    amount_output: Amount,
+    amount: Amount
+) -> Result<Amount, Error<T>> {
+    valid_pool_amount(amount_input).ok_or(Error::<T>::InvalidAmount)?;
+    if amount_input == U256::from(0) {
+        return Err(Error::<T>::InvalidAmount);
+    }
+    valid_pool_amount(amount_output).ok_or(Error::<T>::InvalidAmount)?;
+    valid_pool_amount(amount).ok_or(Error::<T>::InvalidAmount)?;
+
+    // swap rate is almost equal to 0.3%(1021/1024 for convenience in circom)
+    let dividend: Amount = amount_output * amount * 1021;
+    let divisor: Amount = (amount_input + amount) * 1024;
+    let result_amount = dividend.checked_div(divisor).unwrap();
+    return Ok(result_amount);
+}
+
+pub fn calculate_new_k<T: Config>(
+    pool_index: &PoolIndex,
+    amount: Amount
+) -> Result<Amount, Error<T>> {
+    let (_, _, amount_0, amount_1, k) = PoolMap::get(pool_index).ok_or(Error::<T>::PoolNotExists)?;
+
+    valid_pool_amount(amount).ok_or(Error::<T>::InvalidAmount)?;
+
+    let total_old = amount_0 + amount_1;
+    let total_new = total_old + amount;
+    let dividend = total_old * k;
+    let remainder = dividend.checked_rem(total_new).unwrap();
+    let quotient = dividend.checked_div(total_new).unwrap();
+    let k_new = if remainder == U256::from(0) {
+        quotient
+    } else {
+        quotient + 1
+    };
+    return Ok(k_new);
+}
+
+pub fn valid_pool_amount(
+    amount: Amount
+) -> Option<U256> {
+    let maximum = U256::from(1u64) << 125;
+    match amount >= maximum {
+        true => None,
+        false => Some(amount),
+    }
 }
 
 /* --- NFT --- */
