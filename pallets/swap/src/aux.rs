@@ -72,7 +72,8 @@ pub fn create_pool_index<T: Config>(
             token_dst_index.clone(),
             U256::from(0),
             U256::from(0),
-            U256::exp10(ORDER_OF_MAGNITUDE)
+            U256::exp10(ORDER_OF_MAGNITUDE),
+            U256::from(0)
         ),
     );
     return Ok(index);
@@ -114,7 +115,7 @@ pub fn pool_change<T: Config>(
     is_add_1: bool,
     change_1: Amount,
 ) -> Result<(Amount, Amount), Error<T>> {
-    let (token_index_0, token_index_1, amount_0, amount_1, k) =
+    let (token_index_0, token_index_1, amount_0, amount_1, k, rem) =
         PoolMap::get(pool_index).ok_or(Error::<T>::PoolNotExists)?;
     let new_amount_0 = if is_add_0 {
         amount_0
@@ -136,20 +137,21 @@ pub fn pool_change<T: Config>(
     };
     PoolMap::insert(
         pool_index,
-        (token_index_0, token_index_1, new_amount_0, new_amount_1, k)
+        (token_index_0, token_index_1, new_amount_0, new_amount_1, k, rem)
     );
     return Ok((new_amount_0, new_amount_1));
 }
 
-pub fn pool_change_with_k<T: Config>(
+pub fn pool_change_with_k_rem<T: Config>(
     pool_index: &PoolIndex,
     is_add_0: bool,
     change_0: Amount,
     is_add_1: bool,
     change_1: Amount,
-    k_new: Amount
-) -> Result<(Amount, Amount, Amount), Error<T>> {
-    let (token_index_0, token_index_1, amount_0, amount_1, _) =
+    k_new: Amount,
+    rem_new: Amount
+) -> Result<(Amount, Amount, Amount, Amount), Error<T>> {
+    let (token_index_0, token_index_1, amount_0, amount_1, _, _) =
         PoolMap::get(pool_index).ok_or(Error::<T>::PoolNotExists)?;
     let new_amount_0 = if is_add_0 {
         amount_0
@@ -171,9 +173,9 @@ pub fn pool_change_with_k<T: Config>(
     };
     PoolMap::insert(
         pool_index,
-        (token_index_0, token_index_1, new_amount_0, new_amount_1, k_new)
+        (token_index_0, token_index_1, new_amount_0, new_amount_1, k_new, rem_new)
     );
-    return Ok((new_amount_0, new_amount_1, k_new));
+    return Ok((new_amount_0, new_amount_1, k_new, rem_new));
 }
 
 /* ---- Share ---- */
@@ -204,7 +206,7 @@ pub fn get_share_change<T: Config>(
     amount: Amount,
     is_supply: bool
 ) -> Result<Amount, Error<T>>{
-    let (_, _, _, _, k) = PoolMap::get(pool_index).ok_or(Error::<T>::PoolNotExists)?;
+    let (_, _, _, _, k, _) = PoolMap::get(pool_index).ok_or(Error::<T>::PoolNotExists)?;
 
     valid_pool_amount(amount).ok_or(Error::<T>::InvalidAmount)?;
 
@@ -235,25 +237,25 @@ pub fn calculate_swap_result_amount<T: Config>(
     return Ok(result_amount);
 }
 
-pub fn calculate_new_k<T: Config>(
+pub fn calculate_new_k_and_rem<T: Config>(
     pool_index: &PoolIndex,
     amount: Amount
-) -> Result<Amount, Error<T>> {
-    let (_, _, amount_0, amount_1, k) = PoolMap::get(pool_index).ok_or(Error::<T>::PoolNotExists)?;
+) -> Result<(Amount, Amount), Error<T>> {
+    let (_, _, amount_0, amount_1, k, rem) = PoolMap::get(pool_index).ok_or(Error::<T>::PoolNotExists)?;
 
     valid_pool_amount(amount).ok_or(Error::<T>::InvalidAmount)?;
 
     let total_old = amount_0 + amount_1;
     let total_new = total_old + amount;
-    let dividend = total_old * k;
-    let remainder = dividend.checked_rem(total_new).unwrap();
+    let dividend = total_old * k - rem;
     let quotient = dividend.checked_div(total_new).unwrap();
-    let k_new = if remainder == U256::from(0) {
-        quotient
+    let remainder = dividend.checked_rem(total_new).unwrap();
+    let ret = if remainder == U256::from(0) {
+        (quotient, U256::from(0))
     } else {
-        quotient + 1
+        (quotient + 1, total_new - remainder)
     };
-    return Ok(k_new);
+    return Ok(ret);
 }
 
 pub fn valid_pool_amount(

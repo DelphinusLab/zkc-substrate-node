@@ -33,8 +33,8 @@ pub trait Config: frame_system::Config {
 type BalanceOf<T> =
     <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 
-// K = (1/sharePrice) * 10 ^ 12, init the K with 1*10^12
-const ORDER_OF_MAGNITUDE: usize = 12usize;
+// K = (1/sharePrice) * 10 ^ 24, init the K with 1*10^24
+const ORDER_OF_MAGNITUDE: usize = 24usize;
 const PENDING: u8 = 1u8;
 const DONE: u8 = 2u8;
 
@@ -211,7 +211,7 @@ decl_storage! {
 
         pub BalanceMap get(fn balance_map): map hasher(blake2_128_concat) (AccountIndex, TokenIndex) => Amount;
         pub ShareMap get(fn share_map): map hasher(blake2_128_concat) (AccountIndex, PoolIndex) => Amount;
-        pub PoolMap get(fn pool_map): map hasher(blake2_128_concat) PoolIndex => Option<(TokenIndex, TokenIndex, Amount, Amount, Amount)>;
+        pub PoolMap get(fn pool_map): map hasher(blake2_128_concat) PoolIndex => Option<(TokenIndex, TokenIndex, Amount, Amount, Amount, Amount)>;
 
         /* Owner * bid * CurrentWinner */
         pub NFTMap get(fn nft_map): map hasher(blake2_128_concat) NFTId => (AccountIndex, Amount, Option<AccountIndex>);
@@ -459,7 +459,7 @@ decl_module! {
             let new_nonce = nonce_check::<T>(&account, nonce)?;
 
             let ((token_input, amount_input), (token_output, amount_output)) = {
-                let (token0, token1, amount0, amount1, _) = PoolMap::get(&pool_index).ok_or(Error::<T>::PoolNotExists)?;
+                let (token0, token1, amount0, amount1, _, _) = PoolMap::get(&pool_index).ok_or(Error::<T>::PoolNotExists)?;
                 if reverse == 0u8 {
                     ((token0, amount0), (token1, amount1))
                 } else {
@@ -480,9 +480,9 @@ decl_module! {
 
             let new_balance_input = balance_sub::<T>(&account_index, &token_input, amount)?;
             let new_balance_output = balance_add::<T>(&account_index, &token_output, result_amount)?;
-            let k_new = calculate_new_k::<T>(&pool_index, amount - result_amount)?;
+            let (k_new, rem_new) = calculate_new_k_and_rem::<T>(&pool_index, amount - result_amount)?;
 
-            pool_change_with_k::<T>(&pool_index, reverse == 0, if reverse == 0 {amount} else {result_amount}, reverse != 0, if reverse == 0 {result_amount} else {amount}, k_new)?;
+            pool_change_with_k_rem::<T>(&pool_index, reverse == 0, if reverse == 0 {amount} else {result_amount}, reverse != 0, if reverse == 0 {result_amount} else {amount}, k_new, rem_new)?;
 
             let op = Ops::Swap(sign.0, sign.1, sign.2, nonce, account_index, pool_index, reverse, amount);
 
@@ -519,7 +519,7 @@ decl_module! {
             valid_pool_amount(amount0).ok_or(Error::<T>::InvalidAmount)?;
             valid_pool_amount(amount1).ok_or(Error::<T>::InvalidAmount)?;
 
-            let (token0, token1, _, _, _) = PoolMap::get(&pool_index).ok_or(Error::<T>::PoolNotExists)?;
+            let (token0, token1, _, _, _, _) = PoolMap::get(&pool_index).ok_or(Error::<T>::PoolNotExists)?;
 
             let req_id = req_id_get::<T>()?;
             let new_nonce = nonce_check::<T>(&account, nonce)?;
@@ -573,7 +573,7 @@ decl_module! {
             valid_pool_amount(amount0).ok_or(Error::<T>::InvalidAmount)?;
             valid_pool_amount(amount1).ok_or(Error::<T>::InvalidAmount)?;
 
-            let (token0, token1, _, _, _) = PoolMap::get(&pool_index).ok_or(Error::<T>::PoolNotExists)?;
+            let (token0, token1, _, _, _, _) = PoolMap::get(&pool_index).ok_or(Error::<T>::PoolNotExists)?;
 
             let req_id = req_id_get::<T>()?;
             let new_nonce = nonce_check::<T>(&account, nonce)?;
