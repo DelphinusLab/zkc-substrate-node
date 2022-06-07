@@ -8,6 +8,7 @@ fn prepare_unit_test() {
     let amount0 = U256::from(0);
     let amount1 = U256::from(0);
     let k = U256::exp10(ORDER_OF_MAGNITUDE);
+    let rem = U256::from(0);
     PoolMap::insert(
         pool_index,
         (
@@ -15,7 +16,8 @@ fn prepare_unit_test() {
             &token_index1.clone(),
             amount0,
             amount1,
-            k
+            k,
+            rem
         ),
     );
 }
@@ -32,7 +34,7 @@ fn get_share_change_works_is_supply() {
 
         assert_ok!(get_share_change::<Test>(&pool_index, amount, is_supply));
 
-        assert_eq!(get_share_change::<Test>(&pool_index, amount, is_supply).unwrap(), U256::from(999_999_999_999_000u64));
+        assert_eq!(get_share_change::<Test>(&pool_index, amount, is_supply).unwrap(), U256::from(999_999_999_999_999_999_999_999_000u128));
     })
 }
 
@@ -48,7 +50,7 @@ fn get_share_change_works_is_not_supply() {
 
         assert_ok!(get_share_change::<Test>(&pool_index, amount, is_supply));
 
-        assert_eq!(get_share_change::<Test>(&pool_index, amount, is_supply).unwrap(), U256::from(500_000_000_000_000u64));
+        assert_eq!(get_share_change::<Test>(&pool_index, amount, is_supply).unwrap(), U256::from(500_000_000_000_000_000_000_000_000u128));
     })
 }
 

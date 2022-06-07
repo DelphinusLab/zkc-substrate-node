@@ -56,11 +56,11 @@ fn prepare_unit_test() {
 
     assert_ok!(SwapModule::add_pool(Origin::signed(origin), command_sign_formatted, token_index_0, token_index_1, nonce));
  
-    //Deposit 2000 into accountIndex 2, caller is accountIndex 1
+    //Deposit 2500 into accountIndex 2, caller is accountIndex 1
     origin = 1u64;
     let account_index = 2u32;
     let mut token_index = 0u32;
-    let amount = U256::from(2000);
+    let amount = U256::from(2500);
     let mut l1_tx_hash = U256::from(0);
     let mut nonce = 2u64;
 
@@ -78,7 +78,7 @@ fn prepare_unit_test() {
 
     assert_ok!(SwapModule::deposit(Origin::signed(origin), command_sign_formatted, account_index, token_index, amount, l1_tx_hash, nonce));
 
-    //Deposit 2000 into accountIndex 2, caller is accountIndex 1
+    //Deposit 2500 into accountIndex 2, caller is accountIndex 1
     token_index = 1u32;
     l1_tx_hash = U256::from(1);
     nonce = 3u64;
@@ -125,43 +125,20 @@ fn prepare_unit_test() {
     command_sign_formatted[32..].copy_from_slice(&command_sign.s.encode());
 
     assert_ok!(SwapModule::pool_supply(Origin::signed(origin), command_sign_formatted, pool_index, amount0, amount1, nonce));
-
-    //PoolRetrieve amount0 500 and amount1 500 for poolIndex 0, caller is accountIndex 2
-    let origin = 2u64;
-    let account_index = 2u32;
-    let pool_index = 0u32;
-    let amount0 = U256::from(500);
-    let amount1 = U256::from(500);
-    let nonce = 2u64;
-
-    let mut command = [0u8; 81];
-    command[0] = OP_RETRIEVE;
-    command[1..9].copy_from_slice(&nonce.to_be_bytes());
-    command[9..13].copy_from_slice(&account_index.to_be_bytes());
-    command[13..17].copy_from_slice(&pool_index.to_be_bytes());
-    command[17..49].copy_from_slice(&amount0.to_be_bytes());
-    command[49..81].copy_from_slice(&amount1.to_be_bytes());
-
-    let command_sign = BabyJubjub::sign(&command, &secret_key_2);
-    let mut command_sign_formatted :[u8; 64] = [0 as u8;64];
-    command_sign_formatted[..32].copy_from_slice(&command_sign.r.encode());
-    command_sign_formatted[32..].copy_from_slice(&command_sign.s.encode());
-
-    assert_ok!(SwapModule::pool_retrieve(Origin::signed(origin), command_sign_formatted, pool_index, amount0, amount1, nonce));
 }
 
 #[test]
-fn swap_works() {
+fn swap_works_reverse_is_zero() {
     new_test_ext().execute_with(|| {
         prepare_unit_test();
         
-        //Swap amount 100 from tokenIndex1 to tokenIndex0 for poolIndex 0, caller is accountIndex 2
+        //Swap amount 100 from tokenIndex1 to tokenIndex0 for poolIndex 0, caller is accountIndex 2, reverse is 0
         let origin = 2u64;
         let account_index = 2u32;
         let pool_index = 0u32;
         let reverse = 0u8;
         let amount = U256::from(100);
-        let nonce = 3u64;
+        let nonce = 2u64;
         let secret_key_2 = [
             210, 199, 164, 130,  20, 202,  75,  82,
             215,  24,   9, 195,  86, 213, 230,  20,
@@ -184,13 +161,142 @@ fn swap_works() {
 
         assert_ok!(SwapModule::swap(Origin::signed(origin), command_sign_formatted, pool_index, reverse, amount, nonce));
 
-        assert_eq!(PoolMap::get(pool_index).unwrap(), (0u32, 1u32, U256::from(600), U256::from(417), U256::from(983_284_169_125u64)));
+        assert_eq!(PoolMap::get(pool_index).unwrap(), (0u32, 1u32, U256::from(1100), U256::from(910), U256::from(995_024_875_621_890_547_263_682u128), U256::from(820)));
 
         assert_eq!(BalanceMap::get((&account_index, 0u32)), U256::from(1400));
 
-        assert_eq!(BalanceMap::get((&account_index, 1u32)), U256::from(1583));
+        assert_eq!(BalanceMap::get((&account_index, 1u32)), U256::from(1590));
 
-        assert_eq!(NonceMap::<Test>::get(2u64), 4u64);
+        assert_eq!(NonceMap::<Test>::get(2u64), 3u64);
+    })
+}
+
+#[test]
+fn swap_works_reverse_is_one() {
+    new_test_ext().execute_with(|| {
+        prepare_unit_test();
+
+        //Swap amount 100 from tokenIndex1 to tokenIndex0 for poolIndex 0, caller is accountIndex 2, reverse is 1
+        let origin = 2u64;
+        let account_index = 2u32;
+        let pool_index = 0u32;
+        let reverse = 1u8;
+        let amount = U256::from(100);
+        let nonce = 2u64;
+        let secret_key_2 = [
+            210, 199, 164, 130,  20, 202,  75,  82,
+            215,  24,   9, 195,  86, 213, 230,  20,
+            159, 219, 169, 225,  93, 193, 109, 240,
+            185, 222, 254,  50, 115,  63,  97, 179
+        ];
+
+        let mut command = [0u8; 81];
+        command[0] = OP_SWAP;
+        command[1..9].copy_from_slice(&nonce.to_be_bytes());
+        command[9..13].copy_from_slice(&account_index.to_be_bytes());
+        command[13..17].copy_from_slice(&pool_index.to_be_bytes());
+        command[17..49].copy_from_slice(&U256::from(reverse).to_be_bytes());
+        command[49..81].copy_from_slice(&amount.to_be_bytes());
+
+        let command_sign = BabyJubjub::sign(&command, &secret_key_2);
+        let mut command_sign_formatted :[u8; 64] = [0 as u8;64];
+        command_sign_formatted[..32].copy_from_slice(&command_sign.r.encode());
+        command_sign_formatted[32..].copy_from_slice(&command_sign.s.encode());
+
+        assert_ok!(SwapModule::swap(Origin::signed(origin), command_sign_formatted, pool_index, reverse, amount, nonce));
+
+        assert_eq!(PoolMap::get(pool_index).unwrap(), (0u32, 1u32, U256::from(910), U256::from(1100), U256::from(995_024_875_621_890_547_263_682u128), U256::from(820)));
+
+        assert_eq!(BalanceMap::get((&account_index, 0u32)), U256::from(1590));
+
+        assert_eq!(BalanceMap::get((&account_index, 1u32)), U256::from(1400));
+
+        assert_eq!(NonceMap::<Test>::get(2u64), 3u64);
+    })
+}
+
+#[test]
+fn swap_multiple_times_works() {
+    new_test_ext().execute_with(|| {
+        prepare_unit_test();
+
+        //Swap 3 times, amount 100 from tokenIndex1 to tokenIndex0 for poolIndex 0, caller is accountIndex 2
+        let swap_times = 3;
+        let origin = 2u64;
+        let account_index = 2u32;
+        let pool_index = 0u32;
+        let reverse = 0u8;
+        let amount = U256::from(100);
+        let mut nonce = 2u64;
+        let secret_key_2 = [
+            210, 199, 164, 130,  20, 202,  75,  82,
+            215,  24,   9, 195,  86, 213, 230,  20,
+            159, 219, 169, 225,  93, 193, 109, 240,
+            185, 222, 254,  50, 115,  63,  97, 179
+        ];
+
+        let mut command = [0u8; 81];
+        let mut index = 0;
+        let mut command_sign;
+        let mut command_sign_formatted :[u8; 64];
+		let mut liq0 = U256::from(1000);
+		let mut liq1 = U256::from(1000);
+		let mut k = U256::exp10(ORDER_OF_MAGNITUDE);
+		let mut rem = U256::from(0);
+		let mut balance0 = U256::from(1500);
+		let mut balance1 = U256::from(1500);
+		let mut dividend: Amount;
+		let mut divisor;
+		let mut result_amount;
+		let mut total_old;
+		let mut total_new;
+		let mut quotient;
+		let mut remainder;
+
+        while index < swap_times {
+            command[0] = OP_SWAP;
+            command[1..9].copy_from_slice(&nonce.to_be_bytes());
+            command[9..13].copy_from_slice(&account_index.to_be_bytes());
+            command[13..17].copy_from_slice(&pool_index.to_be_bytes());
+            command[17..49].copy_from_slice(&U256::from(reverse).to_be_bytes());
+            command[49..81].copy_from_slice(&amount.to_be_bytes());
+
+            command_sign = BabyJubjub::sign(&command, &secret_key_2);
+            command_sign_formatted = [0 as u8;64];
+            command_sign_formatted[..32].copy_from_slice(&command_sign.r.encode());
+            command_sign_formatted[32..].copy_from_slice(&command_sign.s.encode());
+
+            assert_ok!(SwapModule::swap(Origin::signed(origin), command_sign_formatted, pool_index, reverse, amount, nonce));
+
+            dividend = liq1 * amount * 1021;
+            divisor = (liq0 + amount) * 1024;
+            result_amount = dividend.checked_div(divisor).unwrap();
+            total_old = liq0 + liq1;
+            total_new = total_old + amount - result_amount;
+            dividend = total_old * k - rem;
+            quotient = dividend.checked_div(total_new).unwrap();
+            remainder = dividend.checked_rem(total_new).unwrap();
+
+            (k, rem) = if remainder == U256::from(0) {
+                (quotient, U256::from(0))
+            } else {
+                (quotient + 1, total_new - remainder)
+            };
+            nonce += 1;
+            index += 1;
+            liq0 = liq0 + amount;
+            liq1 = liq1 - result_amount;
+            balance0 = balance0 - amount;
+            balance1 = balance1 + result_amount;
+        }
+
+        assert_eq!(PoolMap::get(pool_index).unwrap(), (0u32, 1u32, liq0, liq1, k, rem));
+
+        assert_eq!(BalanceMap::get((&account_index, 0u32)), balance0);
+
+        assert_eq!(BalanceMap::get((&account_index, 1u32)), balance1);
+
+        assert_eq!(NonceMap::<Test>::get(2u64), nonce);
     })
 }
 
@@ -206,7 +312,7 @@ fn swap_account_not_exists() {
         let pool_index = 0u32;
         let reverse = 0u8;
         let amount = U256::from(100);
-        let nonce = 3u64;
+        let nonce = 2u64;
         let secret_key_2 = [
             210, 199, 164, 130,  20, 202,  75,  82,
             215,  24,   9, 195,  86, 213, 230,  20,
@@ -244,7 +350,7 @@ fn swap_invalid_amount_amount_is_zero() {
         let reverse = 0u8;
         //amount should not be zero
         let amount = U256::from(0);
-        let nonce = 3u64;
+        let nonce = 2u64;
         let secret_key_2 = [
             210, 199, 164, 130,  20, 202,  75,  82,
             215,  24,   9, 195,  86, 213, 230,  20,
@@ -281,7 +387,7 @@ fn swap_invalid_amount_amount_exceeds_range() {
         let reverse = 0u8;
         //amount exceeds the range 125 bits
         let amount = U256::from(1) << 125;
-        let nonce = 3u64;
+        let nonce = 2u64;
         let secret_key_2 = [
             210, 199, 164, 130,  20, 202,  75,  82,
             215,  24,   9, 195,  86, 213, 230,  20,
@@ -317,8 +423,8 @@ fn swap_nonce_inconsistent() {
         let pool_index = 0u32;
         let reverse = 0u8;
         let amount = U256::from(100);
-        // True nonce is 3
-        let nonce = 4u64;
+        // True nonce is 2
+        let nonce = 3u64;
         let secret_key_2 = [
             210, 199, 164, 130,  20, 202,  75,  82,
             215,  24,   9, 195,  86, 213, 230,  20,
@@ -355,7 +461,7 @@ fn swap_pool_not_exists() {
         let pool_index = 1u32;
         let reverse = 0u8;
         let amount = U256::from(100);
-        let nonce = 3u64;
+        let nonce = 2u64;
         let secret_key_2 = [
             210, 199, 164, 130,  20, 202,  75,  82,
             215,  24,   9, 195,  86, 213, 230,  20,
@@ -391,7 +497,7 @@ fn swap_invalid_signature() {
         let pool_index = 0u32;
         let reverse = 0u8;
         let mut amount = U256::from(100);
-        let nonce = 3u64;
+        let nonce = 2u64;
         let secret_key_2 = [
             210, 199, 164, 130,  20, 202,  75,  82,
             215,  24,   9, 195,  86, 213, 230,  20,
@@ -431,7 +537,7 @@ fn swap_balance_not_enough() {
         let reverse = 0u8;
         //tokenIndex0/tokenIndex1 balance is 1500
         let amount = U256::from(1501);
-        let nonce = 3u64;
+        let nonce = 2u64;
         let secret_key_2 = [
             210, 199, 164, 130,  20, 202,  75,  82,
             215,  24,   9, 195,  86, 213, 230,  20,
@@ -495,7 +601,7 @@ fn swap_balance_overflow() {
         let pool_index = 0u32;
         let reverse = 0u8;
         amount = U256::from(100);
-        nonce = 3u64;
+        nonce = 2u64;
         let secret_key_2 = [
             210, 199, 164, 130,  20, 202,  75,  82,
             215,  24,   9, 195,  86, 213, 230,  20,
