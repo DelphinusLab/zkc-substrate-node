@@ -133,13 +133,13 @@ fn pool_supply_works_share_is_zero() {
 
         assert_ok!(SwapModule::pool_supply(Origin::signed(origin), command_sign_formatted, pool_index, amount0, amount1, nonce));
 
-        assert_eq!(PoolMap::get(pool_index).unwrap(), (0u32, 1u32, U256::from(1000), U256::from(1000), U256::exp10(ORDER_OF_MAGNITUDE), U256::from(0)));
+        assert_eq!(PoolMap::get(pool_index).unwrap(), (0u32, 1u32, U256::from(1000), U256::from(1000), U256::from(1_000_000_000_000_000_000u128)));
 
         assert_eq!(BalanceMap::get((account_index, 0u32)), U256::from(1000));
 
         assert_eq!(BalanceMap::get((account_index, 1u32)), U256::from(1000));
 
-        assert_eq!(ShareMap::get((&account_index, &pool_index)), U256::from(1_999_999_999_999_999_999_999_998_000u128));
+        assert_eq!(ShareMap::get((&account_index, &pool_index)), U256::from(1_000_000_000_000_000_000u128));
 
         assert_eq!(NonceMap::<Test>::get(2u64), 2u64);
     })
@@ -150,17 +150,13 @@ fn pool_supply_works_share_is_not_zero() {
     new_test_ext().execute_with(|| {
         prepare_unit_test();
 
-        //ShareMap for poolIndex 0
+        //PoolSupply amount0 1000 and amount1 1000 for poolIndex 0, caller is accountIndex 2
+        let origin = 2u64;
         let account_index = 2u32;
         let pool_index = 0u32;
-        ShareMap::insert((&account_index, &pool_index), U256::from(1_999_999_999_999_999_999_999_998_000u128));
-
-        //PoolSupply amount0 1000 and amount1 1000 for poolIndex 0, caller is accountIndex 2
-        //Share of accountIndex 2 is not 0
-        let origin = 2u64;
         let amount0 = U256::from(1000);
         let amount1 = U256::from(1000);
-        let nonce = 1u64;
+        let mut nonce = 1u64;
         let secret_key_2 = [
             210, 199, 164, 130,  20, 202,  75,  82,
             215,  24,   9, 195,  86, 213, 230,  20,
@@ -183,15 +179,34 @@ fn pool_supply_works_share_is_not_zero() {
 
         assert_ok!(SwapModule::pool_supply(Origin::signed(origin), command_sign_formatted, pool_index, amount0, amount1, nonce));
 
-        assert_eq!(PoolMap::get(pool_index).unwrap(), (0u32, 1u32, U256::from(1000), U256::from(1000), U256::exp10(ORDER_OF_MAGNITUDE), U256::from(0)));
+        //PoolSupply amount0 1000 and amount1 1000 for poolIndex 0, caller is accountIndex 2
+        //Share of accountIndex 2 is not 0
+        nonce = 2u64;
 
-        assert_eq!(BalanceMap::get((&account_index, 0u32)), U256::from(1000));
+        let mut command = [0u8; 81];
+        command[0] = OP_SUPPLY;
+        command[1..9].copy_from_slice(&nonce.to_be_bytes());
+        command[9..13].copy_from_slice(&account_index.to_be_bytes());
+        command[13..17].copy_from_slice(&pool_index.to_be_bytes());
+        command[17..49].copy_from_slice(&amount0.to_be_bytes());
+        command[49..81].copy_from_slice(&amount1.to_be_bytes());
 
-        assert_eq!(BalanceMap::get((&account_index, 1u32)), U256::from(1000));
+        let command_sign = BabyJubjub::sign(&command, &secret_key_2);
+        let mut command_sign_formatted: [u8; 64] = [0 as u8;64];
+        command_sign_formatted[..32].copy_from_slice(&command_sign.r.encode());
+        command_sign_formatted[32..].copy_from_slice(&command_sign.s.encode());
 
-        assert_eq!(ShareMap::get((&account_index, &pool_index)), U256::from(3_999_999_999_999_999_999_999_996_000u128));
+        assert_ok!(SwapModule::pool_supply(Origin::signed(origin), command_sign_formatted, pool_index, amount0, amount1, nonce));
 
-        assert_eq!(NonceMap::<Test>::get(2u64), 2u64);
+        assert_eq!(PoolMap::get(pool_index).unwrap(), (0u32, 1u32, U256::from(2000), U256::from(2000), U256::from(2_000_000_000_000_000_000u128)));
+
+        assert_eq!(BalanceMap::get((&account_index, 0u32)), U256::from(0));
+
+        assert_eq!(BalanceMap::get((&account_index, 1u32)), U256::from(0));
+
+        assert_eq!(ShareMap::get((&account_index, &pool_index)), U256::from(2_000_000_000_000_000_000u128));
+
+        assert_eq!(NonceMap::<Test>::get(2u64), 3u64);
     })
 }
 
@@ -238,12 +253,12 @@ fn pool_supply_invalid_amount() {
     new_test_ext().execute_with(|| {
         prepare_unit_test();
 
-        //PoolSupply amount0 U256::from(1) << 125 + 1 and amount1 1000 for poolIndex 0, caller is accountIndex 2
+        //PoolSupply amount0 U256::from(1) << 99 + 1 and amount1 1000 for poolIndex 0, caller is accountIndex 2
         let origin = 2u64;
         let account_index = 2u32;
         let pool_index = 0u32;
-        //U256::from(1) << 125 exceeds the range 125 bits
-        let amount0 = U256::from(1) << 125;
+        //U256::from(1) << 125 exceeds the range 99 bits
+        let amount0 = U256::from(1) << 99;
         let amount1 = U256::from(1000);
         let nonce = 1u64;
         let secret_key_2 = [
