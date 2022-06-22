@@ -54,7 +54,7 @@ fn add_pool_works() {
 
         assert_eq!(PoolIndexMap::get((&token_index_0, &token_index_1)).unwrap(), 0u32);
 
-        assert_eq!(PoolMap::get(0u32).unwrap(), (0u32, 1u32, U256::from(0), U256::from(0), U256::exp10(ORDER_OF_MAGNITUDE), U256::from(0)));
+        assert_eq!(PoolMap::get(0u32).unwrap(), (0u32, 1u32, U256::from(0), U256::from(0), U256::from(0)));
 
         assert_eq!(NonceMap::<Test>::get(1u64), 2);
     })

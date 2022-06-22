@@ -18,26 +18,8 @@ fn calculate_swap_result_amount_works() {
 fn calculate_swap_result_amount_invalid_amount_amount_input_exceeds_range() {
     new_test_ext().execute_with(|| {
         //CalculateSwapResultAmount
-        //amount_input exceeds the range 125bits
-        let amount_input = U256::from(1) << 125;
-        let amount_output = U256::from(1000);
-        let amount = U256::from(500);
-
-        match calculate_swap_result_amount::<Test>(amount_input, amount_output, amount) {
-            Ok(_) => assert!(false),
-            Err(e) => {
-                assert!(matches!(e, Error::<Test>::InvalidAmount));
-            }
-        }
-    })
-}
-
-#[test]
-fn calculate_swap_result_amount_invalid_amount_amount_input_is_zero() {
-    new_test_ext().execute_with(|| {
-        //CalculateSwapResultAmount
-        //amount_input should not be zero
-        let amount_input = U256::from(0);
+        //amount_input exceeds the range 99 bits
+        let amount_input = U256::from(1) << 99;
         let amount_output = U256::from(1000);
         let amount = U256::from(500);
 
@@ -55,8 +37,8 @@ fn calculate_swap_result_amount_invalid_amount_amount_output_exceeds_range() {
     new_test_ext().execute_with(|| {
         //CalculateSwapResultAmount
         let amount_input = U256::from(0);
-        //amount_output exceeds the range 125bits
-        let amount_output = U256::from(1) << 125;
+        //amount_output exceeds the range 99 bits
+        let amount_output = U256::from(1) << 99;
         let amount = U256::from(500);
 
         match calculate_swap_result_amount::<Test>(amount_input, amount_output, amount) {
@@ -74,8 +56,8 @@ fn calculate_swap_result_amount_invalid_amount_amount_exceeds_range() {
         //CalculateSwapResultAmount
         let amount_input = U256::from(1000);
         let amount_output = U256::from(1000);
-        //amount exceeds the range 125 bits
-        let amount = U256::from(1) << 125;
+        //amount exceeds the range 99 bits
+        let amount = U256::from(1) << 99;
 
         match calculate_swap_result_amount::<Test>(amount_input, amount_output, amount) {
             Ok(_) => assert!(false),
