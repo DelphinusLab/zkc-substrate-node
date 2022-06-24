@@ -50,5 +50,8 @@ mod multi_supplier_multi_swap_cannot_retrieve_all_test;
 #[path = "tests/scenario_tests/multi_supplier_multi_swap_retrieve_all_test.rs"]
 mod multi_supplier_multi_swap_retrieve_all_test;
 
-#[path = "tests/scenario_tests/multi_supplier_multi_swap_multi_supply_test.rs"]
-mod multi_supplier_multi_swap_multi_supply_test;
+#[path = "tests/scenario_tests/multi_supplier_multi_swap_multi_supply_small_amount_test.rs"]
+mod multi_supplier_multi_swap_multi_supply_small_amount_test;
+
+#[path = "tests/scenario_tests/multi_supplier_multi_swap_multi_retrieve_small_amount_test.rs"]
+mod multi_supplier_multi_swap_multi_retrieve_small_amount_test;
