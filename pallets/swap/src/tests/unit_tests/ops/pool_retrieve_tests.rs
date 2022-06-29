@@ -497,7 +497,7 @@ fn pool_retrieve_y_amount_invalid() {
         command_sign_formatted[..32].copy_from_slice(&command_sign.r.encode());
         command_sign_formatted[32..].copy_from_slice(&command_sign.s.encode());
 
-        assert_noop!(SwapModule::pool_retrieve(Origin::signed(origin), command_sign_formatted, pool_index, amount0, amount1, nonce), Error::<Test>::InvalidAmount);
+        assert_noop!(SwapModule::pool_retrieve(Origin::signed(origin), command_sign_formatted, pool_index, amount0, amount1, nonce), Error::<Test>::InvalidAmountRatio);
 
     })
 }

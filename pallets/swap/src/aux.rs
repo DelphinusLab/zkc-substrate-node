@@ -262,7 +262,7 @@ pub fn valid_pool_amount(
     }
 }
 
-pub fn valid_input_y_amount<T: Config>(
+pub fn valid_input_y_amount(
     liq0: Amount,
     liq1: Amount,
     input_x: Amount,

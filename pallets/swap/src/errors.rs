@@ -34,6 +34,7 @@ decl_error! {
         InvalidTokenPair,
         InvalidTokenIndex,
         InvalidAmount,
+        InvalidAmountRatio,
         InvalidKey,
         InvalidSignature,
         InvalidAccount,
