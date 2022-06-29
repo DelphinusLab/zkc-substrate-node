@@ -518,7 +518,8 @@ decl_module! {
             valid_pool_amount(amount0).ok_or(Error::<T>::InvalidAmount)?;
             valid_pool_amount(amount1).ok_or(Error::<T>::InvalidAmount)?;
 
-            let (token0, token1, _, _, _) = PoolMap::get(&pool_index).ok_or(Error::<T>::PoolNotExists)?;
+            let (token0, token1, liq0, liq1, _) = PoolMap::get(&pool_index).ok_or(Error::<T>::PoolNotExists)?;
+            valid_input_y_amount(liq0, liq1, amount0, amount1, true).ok_or(Error::<T>::InvalidAmountRatio)?;
 
             let req_id = req_id_get::<T>()?;
             let new_nonce = nonce_check::<T>(&account, nonce)?;
@@ -572,7 +573,8 @@ decl_module! {
             valid_pool_amount(amount0).ok_or(Error::<T>::InvalidAmount)?;
             valid_pool_amount(amount1).ok_or(Error::<T>::InvalidAmount)?;
 
-            let (token0, token1, _, _, _) = PoolMap::get(&pool_index).ok_or(Error::<T>::PoolNotExists)?;
+            let (token0, token1, liq0, liq1, _) = PoolMap::get(&pool_index).ok_or(Error::<T>::PoolNotExists)?;
+            valid_input_y_amount(liq0, liq1, amount0, amount1, false).ok_or(Error::<T>::InvalidAmountRatio)?;
 
             let req_id = req_id_get::<T>()?;
             let new_nonce = nonce_check::<T>(&account, nonce)?;

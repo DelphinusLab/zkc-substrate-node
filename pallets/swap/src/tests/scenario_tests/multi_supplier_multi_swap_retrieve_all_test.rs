@@ -652,11 +652,11 @@ fn multi_supplier_multi_swap_retrieve_all_works_swap_not_after_supply() {
 
         assert_ok!(SwapModule::pool_supply(Origin::signed(origin), command_sign_formatted, pool_index, amount0, amount1, nonce));
 
-        //PoolRetrieve amount0 499 and amount1 499 for poolIndex 0, caller is accountIndex 3
+        //PoolRetrieve amount0 499 and amount1 490 for poolIndex 0, caller is accountIndex 3
         origin = 3u64;
         account_index = 3u32;
         amount0 = U256::from(499);
-        amount1 = U256::from(499);
+        amount1 = U256::from(490);
         nonce = 2u64;
 
         command = [0u8; 81];
@@ -674,21 +674,21 @@ fn multi_supplier_multi_swap_retrieve_all_works_swap_not_after_supply() {
 
         assert_ok!(SwapModule::pool_retrieve(Origin::signed(origin), command_sign_formatted, pool_index, amount0, amount1, nonce));
 
-        assert_eq!(PoolMap::get(pool_index).unwrap(), (0u32, 1u32, U256::from(511), U256::from(493), U256::from(500_980_392_156_862_745u128)));
+        assert_eq!(PoolMap::get(pool_index).unwrap(), (0u32, 1u32, U256::from(511), U256::from(502), U256::from(500_980_392_156_862_745u128)));
 
         assert_eq!(BalanceMap::get((&account_index, 0u32)), U256::from(1999));
 
-        assert_eq!(BalanceMap::get((&account_index, 1u32)), U256::from(1999));
+        assert_eq!(BalanceMap::get((&account_index, 1u32)), U256::from(1990));
 
         assert_eq!(ShareMap::get((&account_index, &pool_index)), U256::from(980_392_156_862_745u128));
 
         assert_eq!(NonceMap::<Test>::get(3u64), 3u64);
 
-        //PoolRetrieve amount0 510 and amount1 492 for poolIndex 0, caller is accountIndex 2
+        //PoolRetrieve amount0 510 and amount1 501 for poolIndex 0, caller is accountIndex 2
         origin = 2u64;
         account_index = 2u32;
         amount0 = U256::from(510);
-        amount1 = U256::from(492);
+        amount1 = U256::from(501);
         nonce = 2u64;
 
         command = [0u8; 81];
@@ -710,7 +710,7 @@ fn multi_supplier_multi_swap_retrieve_all_works_swap_not_after_supply() {
 
         assert_eq!(BalanceMap::get((&account_index, 0u32)), U256::from(2010));
 
-        assert_eq!(BalanceMap::get((&account_index, 1u32)), U256::from(1992));
+        assert_eq!(BalanceMap::get((&account_index, 1u32)), U256::from(2001));
 
         assert_eq!(ShareMap::get((&account_index, &pool_index)), U256::from(0));
 

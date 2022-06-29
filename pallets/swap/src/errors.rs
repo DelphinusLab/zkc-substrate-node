@@ -38,6 +38,7 @@ decl_error! {
         InvalidSignature,
         InvalidAccount,
         IsNotOwner,
-        InvalidNFTIndex
+        InvalidNFTIndex,
+        InvalidAmountRatio
     }
 }
