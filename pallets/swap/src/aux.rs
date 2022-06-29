@@ -262,6 +262,25 @@ pub fn valid_pool_amount(
     }
 }
 
+pub fn valid_input_y_amount<T: Config>(
+    liq0: Amount,
+    liq1: Amount,
+    input_x: Amount,
+    input_y: Amount,
+    is_supply: bool
+) -> Option<U256> {
+    let validation;
+    if is_supply {
+        validation = input_y * liq0 >= input_x * liq1;
+    } else {
+        validation = input_y * liq0 <= input_x * liq1;
+    }
+    match validation {
+        true => Some(input_y),
+        false => None,
+    }
+}
+
 /* --- NFT --- */
 
 trait NFTData<T: Config> {
