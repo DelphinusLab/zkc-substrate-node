@@ -219,18 +219,19 @@ pub fn get_share_change<T: Config>(
 
     let share_change = if is_supply {
         if total_share != U256::from(0) {
-            let dividend = (amount * total_share).valid_on_circuit().ok_or(Error::<T>::InternalMulOverflow)?;
+            let dividend = amount.checked_mul_on_circuit(total_share).ok_or(Error::<T>::InternalCalcOverflow)?;
             let divisor = amount0;
-            dividend / divisor
+            let result = dividend.checked_div_on_circuit(divisor).ok_or(Error::<T>::InternalCalcOverflow)?;
+            result
         } else {
-            let initial_amount = (amount * U256::exp10(ORDER_OF_MAGNITUDE)).valid_on_circuit().ok_or(Error::<T>::InternalMulOverflow)?;
+            let initial_amount = amount.checked_mul_on_circuit(U256::exp10(ORDER_OF_MAGNITUDE)).ok_or(Error::<T>::InternalCalcOverflow)?;
             initial_amount
         }
     } else {
-        let dividend = (amount * total_share).valid_on_circuit().ok_or(Error::<T>::InternalMulOverflow)?;
+        let dividend = amount.checked_mul_on_circuit(total_share).ok_or(Error::<T>::InternalCalcOverflow)?;
         let divisor = amount0;
-        let share = dividend / divisor;
-        let rem = dividend % divisor;
+        let share = dividend.checked_div_on_circuit(divisor).ok_or(Error::<T>::InternalCalcOverflow)?;
+        let rem = dividend.checked_rem_on_circuit(divisor).ok_or(Error::<T>::InternalCalcOverflow)?;
 
         if rem != U256::from(0) {
             share + 1
@@ -251,9 +252,9 @@ pub fn calculate_swap_result_amount<T: Config>(
     valid_pool_amount(amount).ok_or(Error::<T>::InvalidAmount)?;
 
     // swap rate is almost equal to 0.3%(1021/1024 for convenience in circom)
-    let dividend: Amount = (amount_output * amount * U256::from(1021)).valid_on_circuit().ok_or(Error::<T>::InternalMulOverflow)?;
-    let divisor: Amount = ((amount_input + amount) * U256::from(1024)).valid_on_circuit().ok_or(Error::<T>::InternalMulOverflow)?;
-    let result_amount = dividend.checked_div(divisor).unwrap();
+    let dividend: Amount = amount_output.checked_mul_on_circuit(amount).ok_or(Error::<T>::InternalCalcOverflow)?.checked_mul_on_circuit(U256::from(1021)).ok_or(Error::<T>::InternalCalcOverflow)?;
+    let divisor: Amount = (amount_input + amount).checked_mul_on_circuit(U256::from(1024)).ok_or(Error::<T>::InternalCalcOverflow)?;
+    let result_amount = dividend.checked_div_on_circuit(divisor).ok_or(Error::<T>::InternalCalcOverflow)?;
     return Ok(result_amount);
 }
 
@@ -268,18 +269,26 @@ pub fn valid_pool_amount(
 }
 
 pub fn valid_input_y_amount(
-    input_y_mul_liq0: Amount,
-    input_x_mul_liq1: Amount,
+    liq0: Amount,
+    liq1: Amount,
+    input_x: Amount,
+    input_y: Amount,
     is_supply: bool
 ) -> Option<U256> {
     let validation: bool;
-    if is_supply {
-        validation = input_y_mul_liq0 >= input_x_mul_liq1;
+    let input_y_mul_liq0 = input_y.checked_mul_on_circuit(liq0);
+    let input_x_mul_liq1 = input_x.checked_mul_on_circuit(liq1);
+    if input_y_mul_liq0.is_some() && input_x_mul_liq1.is_some() {
+        if is_supply {
+            validation = input_y_mul_liq0 >= input_x_mul_liq1;
+        } else {
+            validation = input_y_mul_liq0 <= input_x_mul_liq1;
+        }
     } else {
-        validation = input_y_mul_liq0 <= input_x_mul_liq1;
+        validation = false;
     }
     match validation {
-        true => Some(input_y_mul_liq0),
+        true => Some(input_y),
         false => None,
     }
 }
@@ -422,12 +431,36 @@ impl U256ToByte for U256 {
 
 pub trait CircuitRange<T> {
     fn checked_add_on_circuit(&self, rhs: T) -> Option<T>;
+    fn checked_mul_on_circuit(&self, rhs: T) -> Option<T>;
+    fn checked_div_on_circuit(&self, rhs: T) -> Option<T>;
+    fn checked_rem_on_circuit(&self, rhs: T) -> Option<T>;
     fn valid_on_circuit(&self) -> Option<T>;
 }
 
 impl CircuitRange<U256> for U256 {
     fn checked_add_on_circuit(&self, rhs: U256) -> Option<U256> {
         match self.checked_add(rhs) {
+            None => None,
+            Some(res) => res.valid_on_circuit(),
+        }
+    }
+
+    fn checked_mul_on_circuit(&self, rhs: U256) -> Option<U256> {
+        match self.checked_mul(rhs) {
+            None => None,
+            Some(res) => res.valid_on_circuit(),
+        }
+    }
+
+    fn checked_div_on_circuit(&self, rhs: U256) -> Option<U256> {
+        match self.checked_div(rhs) {
+            None => None,
+            Some(res) => res.valid_on_circuit(),
+        }
+    }
+
+    fn checked_rem_on_circuit(&self, rhs: U256) -> Option<U256> {
+        match self.checked_rem(rhs) {
             None => None,
             Some(res) => res.valid_on_circuit(),
         }

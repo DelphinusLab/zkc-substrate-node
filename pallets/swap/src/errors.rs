@@ -40,6 +40,6 @@ decl_error! {
         IsNotOwner,
         InvalidNFTIndex,
         InvalidAmountRatio,
-        InternalMulOverflow
+        InternalCalcOverflow
     }
 }

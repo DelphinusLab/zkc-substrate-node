@@ -168,3 +168,37 @@ fn get_share_change_invalid_amount() {
         }
     })
 }
+
+#[test]
+fn get_share_change_overflow_during_calculation() {
+    new_test_ext().execute_with(|| {
+        //PoolMap insert new value
+        let pool_index = 0u32;
+        let token_index0 = 0u32;
+        let token_index1 = 1u32;
+        let amount0 = U256::from(500);
+        let amount1 = U256::from(500);
+        let total_share = (U256::from(1) << 250) - 1;
+        PoolMap::insert(
+            pool_index,
+            (
+                &token_index0.clone(),
+                &token_index1.clone(),
+                amount0,
+                amount1,
+                total_share
+            ),
+        );
+
+        // 2 * (2^250 - 1) would overflow during calculation
+        let amount = U256::from(2);
+        let is_supply = false;
+
+        match get_share_change::<Test>(&pool_index, amount, is_supply) {
+            Ok(_) => assert!(false),
+            Err(e) => {
+                assert!(matches!(e, Error::<Test>::InternalCalcOverflow));
+            }
+        }
+    })
+}
