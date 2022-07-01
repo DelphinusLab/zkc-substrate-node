@@ -219,13 +219,18 @@ pub fn get_share_change<T: Config>(
 
     let share_change = if is_supply {
         if total_share != U256::from(0) {
-            amount * total_share / amount0
+            let dividend = (amount * total_share).valid_on_circuit().ok_or(Error::<T>::InternalMulOverflow)?;
+            let divisor = amount0;
+            dividend / divisor
         } else {
-            amount * U256::exp10(ORDER_OF_MAGNITUDE)
+            let initial_amount = (amount * U256::exp10(ORDER_OF_MAGNITUDE)).valid_on_circuit().ok_or(Error::<T>::InternalMulOverflow)?;
+            initial_amount
         }
     } else {
-        let share = amount * total_share / amount0;
-        let rem = amount * total_share % amount0;
+        let dividend = (amount * total_share).valid_on_circuit().ok_or(Error::<T>::InternalMulOverflow)?;
+        let divisor = amount0;
+        let share = dividend / divisor;
+        let rem = dividend % divisor;
 
         if rem != U256::from(0) {
             share + 1
@@ -246,8 +251,8 @@ pub fn calculate_swap_result_amount<T: Config>(
     valid_pool_amount(amount).ok_or(Error::<T>::InvalidAmount)?;
 
     // swap rate is almost equal to 0.3%(1021/1024 for convenience in circom)
-    let dividend: Amount = amount_output * amount * 1021;
-    let divisor: Amount = (amount_input + amount) * 1024;
+    let dividend: Amount = (amount_output * amount * U256::from(1021)).valid_on_circuit().ok_or(Error::<T>::InternalMulOverflow)?;
+    let divisor: Amount = ((amount_input + amount) * U256::from(1024)).valid_on_circuit().ok_or(Error::<T>::InternalMulOverflow)?;
     let result_amount = dividend.checked_div(divisor).unwrap();
     return Ok(result_amount);
 }
@@ -263,20 +268,18 @@ pub fn valid_pool_amount(
 }
 
 pub fn valid_input_y_amount(
-    liq0: Amount,
-    liq1: Amount,
-    input_x: Amount,
-    input_y: Amount,
+    input_y_mul_liq0: Amount,
+    input_x_mul_liq1: Amount,
     is_supply: bool
 ) -> Option<U256> {
-    let validation;
+    let validation: bool;
     if is_supply {
-        validation = input_y * liq0 >= input_x * liq1;
+        validation = input_y_mul_liq0 >= input_x_mul_liq1;
     } else {
-        validation = input_y * liq0 <= input_x * liq1;
+        validation = input_y_mul_liq0 <= input_x_mul_liq1;
     }
     match validation {
-        true => Some(input_y),
+        true => Some(input_y_mul_liq0),
         false => None,
     }
 }

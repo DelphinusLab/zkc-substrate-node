@@ -39,6 +39,7 @@ decl_error! {
         InvalidAccount,
         IsNotOwner,
         InvalidNFTIndex,
-        InvalidAmountRatio
+        InvalidAmountRatio,
+        InternalMulOverflow
     }
 }

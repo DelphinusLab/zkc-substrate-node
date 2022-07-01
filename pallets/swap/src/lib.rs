@@ -519,7 +519,9 @@ decl_module! {
             valid_pool_amount(amount1).ok_or(Error::<T>::InvalidAmount)?;
 
             let (token0, token1, liq0, liq1, _) = PoolMap::get(&pool_index).ok_or(Error::<T>::PoolNotExists)?;
-            valid_input_y_amount(liq0, liq1, amount0, amount1, true).ok_or(Error::<T>::InvalidAmountRatio)?;
+            let input_y_mul_liq0: Amount = (amount1 * liq0).valid_on_circuit().ok_or(Error::<T>::InternalMulOverflow)?;
+            let input_x_mul_liq1: Amount = (amount0 * liq1).valid_on_circuit().ok_or(Error::<T>::InternalMulOverflow)?;
+            valid_input_y_amount(input_y_mul_liq0, input_x_mul_liq1, true).ok_or(Error::<T>::InvalidAmountRatio)?;
 
             let req_id = req_id_get::<T>()?;
             let new_nonce = nonce_check::<T>(&account, nonce)?;
@@ -574,7 +576,9 @@ decl_module! {
             valid_pool_amount(amount1).ok_or(Error::<T>::InvalidAmount)?;
 
             let (token0, token1, liq0, liq1, _) = PoolMap::get(&pool_index).ok_or(Error::<T>::PoolNotExists)?;
-            valid_input_y_amount(liq0, liq1, amount0, amount1, false).ok_or(Error::<T>::InvalidAmountRatio)?;
+            let input_y_mul_liq0: Amount = (amount1 * liq0).valid_on_circuit().ok_or(Error::<T>::InternalMulOverflow)?;
+            let input_x_mul_liq1: Amount = (amount0 * liq1).valid_on_circuit().ok_or(Error::<T>::InternalMulOverflow)?;
+            valid_input_y_amount(input_y_mul_liq0, input_x_mul_liq1, false).ok_or(Error::<T>::InvalidAmountRatio)?;
 
             let req_id = req_id_get::<T>()?;
             let new_nonce = nonce_check::<T>(&account, nonce)?;
