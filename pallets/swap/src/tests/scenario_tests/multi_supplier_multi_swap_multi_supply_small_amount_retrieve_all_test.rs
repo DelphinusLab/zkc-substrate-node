@@ -1,8 +1,8 @@
 use super::*;
 
 #[test]
-//A supply big, B supply big, multi swap, A retrieve a lot and leave some share which is 10 token value (which means if retrieve once, A can retrieve 10), A multi time retrieve n times, each retrieve 1
-fn multi_supplier_multi_swap_multi_retrieve_small_amount_works() {
+//A supply big, B supply big, multi swap, A retrieve all, A multi supply 10 times small amount, B retrieve
+fn multi_supplier_multi_swap_multi_supply_small_amount_retrieve_all_works() {
     new_test_ext().execute_with(|| {
         //SetKey for accountIndex 0
         let mut origin = 0u64;
@@ -69,11 +69,11 @@ fn multi_supplier_multi_swap_multi_retrieve_small_amount_works() {
 
         assert_ok!(SwapModule::add_pool(Origin::signed(origin), command_sign_formatted, token_index_0, token_index_1, nonce));
 
-        //Deposit 30000 into accountIndex 2, caller is accountIndex 1, tokenIndex is 0
+        //Deposit 10000 into accountIndex 2, caller is accountIndex 1, tokenIndex is 0
         origin = 1u64;
         let mut account_index = 2u32;
         let mut token_index = 0u32;
-        let mut amount = U256::from(30000);
+        let mut amount = U256::from(10000);
         let mut l1_tx_hash = U256::from(0);
         nonce = 2u64;
 
@@ -91,7 +91,7 @@ fn multi_supplier_multi_swap_multi_retrieve_small_amount_works() {
 
         assert_ok!(SwapModule::deposit(Origin::signed(origin), command_sign_formatted, account_index, token_index, amount, l1_tx_hash, nonce));
 
-        //Deposit 30000 into accountIndex 2, caller is accountIndex 1, tokenIndex is 1
+        //Deposit 10000 into accountIndex 2, caller is accountIndex 1, tokenIndex is 1
         token_index = 1u32;
         l1_tx_hash = U256::from(1);
         nonce = 3u64;
@@ -110,7 +110,7 @@ fn multi_supplier_multi_swap_multi_retrieve_small_amount_works() {
 
         assert_ok!(SwapModule::deposit(Origin::signed(origin), command_sign_formatted, account_index, token_index, amount, l1_tx_hash, nonce));
         
-        //Deposit 30000 into accountIndex 3, caller is accountIndex 1, tokenIndex is 0
+        //Deposit 10000 into accountIndex 3, caller is accountIndex 1, tokenIndex is 0
         account_index = 3u32;
         token_index = 0u32;
         l1_tx_hash = U256::from(2);
@@ -130,7 +130,7 @@ fn multi_supplier_multi_swap_multi_retrieve_small_amount_works() {
 
         assert_ok!(SwapModule::deposit(Origin::signed(origin), command_sign_formatted, account_index, token_index, amount, l1_tx_hash, nonce));
 
-        //Deposit 30000 into accountIndex 3, caller is accountIndex 1, tokenIndex is 1
+        //Deposit 10000 into accountIndex 3, caller is accountIndex 1, tokenIndex is 1
         token_index = 1u32;
         l1_tx_hash = U256::from(3);
         nonce = 5u64;
@@ -148,13 +148,52 @@ fn multi_supplier_multi_swap_multi_retrieve_small_amount_works() {
         command_sign_formatted[32..].copy_from_slice(&command_sign.s.encode());
 
         assert_ok!(SwapModule::deposit(Origin::signed(origin), command_sign_formatted, account_index, token_index, amount, l1_tx_hash, nonce));
+        
+        //Deposit 2000 into accountIndex 0, caller is accountIndex 1, tokenIndex is 0
+        account_index = 0u32;
+        token_index = 0u32;
+        l1_tx_hash = U256::from(4);
+        nonce = 6u64;
 
-        //PoolSupply amount0 20000 and amount1 20000 for poolIndex 0, caller is accountIndex 2
+        command = [0u8; 81];
+        command[0] = OP_DEPOSIT;
+        command[1..9].copy_from_slice(&nonce.to_be_bytes());
+        command[9..13].copy_from_slice(&account_index.to_be_bytes());
+        command[13..17].copy_from_slice(&token_index.to_be_bytes());
+        command[17..49].copy_from_slice(&amount.to_be_bytes());
+
+        command_sign = BabyJubjub::sign(&command, &secret_key_1);
+        command_sign_formatted = [0 as u8;64];
+        command_sign_formatted[..32].copy_from_slice(&command_sign.r.encode());
+        command_sign_formatted[32..].copy_from_slice(&command_sign.s.encode());
+
+        assert_ok!(SwapModule::deposit(Origin::signed(origin), command_sign_formatted, account_index, token_index, amount, l1_tx_hash, nonce));
+
+        //Deposit 2000 into accountIndex 0, caller is accountIndex 1, tokenIndex is 1
+        token_index = 1u32;
+        l1_tx_hash = U256::from(5);
+        nonce = 7u64;
+
+        command = [0u8; 81];
+        command[0] = OP_DEPOSIT;
+        command[1..9].copy_from_slice(&nonce.to_be_bytes());
+        command[9..13].copy_from_slice(&account_index.to_be_bytes());
+        command[13..17].copy_from_slice(&token_index.to_be_bytes());
+        command[17..49].copy_from_slice(&amount.to_be_bytes());
+
+        command_sign = BabyJubjub::sign(&command, &secret_key_1);
+        command_sign_formatted = [0 as u8;64];
+        command_sign_formatted[..32].copy_from_slice(&command_sign.r.encode());
+        command_sign_formatted[32..].copy_from_slice(&command_sign.s.encode());
+
+        assert_ok!(SwapModule::deposit(Origin::signed(origin), command_sign_formatted, account_index, token_index, amount, l1_tx_hash, nonce));
+
+        //PoolSupply amount0 5000 and amount1 5000 for poolIndex 0, caller is accountIndex 2
         origin = 2u64;
 		account_index = 2u32;
         let pool_index = 0u32;
-        let mut amount0 = U256::from(20000);
-        let mut amount1 = U256::from(20000);
+        let mut amount0 = U256::from(5000);
+        let mut amount1 = U256::from(5000);
         nonce = 1u64;
         let secret_key_2 = [
             210, 199, 164, 130,  20, 202,  75,  82,
@@ -178,11 +217,9 @@ fn multi_supplier_multi_swap_multi_retrieve_small_amount_works() {
 
         assert_ok!(SwapModule::pool_supply(Origin::signed(origin), command_sign_formatted, pool_index, amount0, amount1, nonce));
 
-        //PoolSupply amount0 20200 and amount1 20200 for poolIndex 0, caller is accountIndex 3
+        //PoolSupply amount0 5000 and amount1 5000 for poolIndex 0, caller is accountIndex 3
         origin = 3u64;
 		account_index = 3u32;
-        amount0 = U256::from(20200);
-        amount1 = U256::from(20200);
         nonce = 1u64;
         let secret_key_3 = [
             8, 123, 229, 206, 38, 143,  38, 167,
@@ -205,12 +242,37 @@ fn multi_supplier_multi_swap_multi_retrieve_small_amount_works() {
         command_sign_formatted[32..].copy_from_slice(&command_sign.s.encode());
 
         assert_ok!(SwapModule::pool_supply(Origin::signed(origin), command_sign_formatted, pool_index, amount0, amount1, nonce));
+ 
+        //Swap amount 100 from tokenIndex0 to tokenIndex1 for poolIndex 0, caller is accountIndex 0, reverse is 0
+        origin = 0u64;
+        account_index = 0u32;
+        let reverse = 0u8;
+        amount = U256::from(100);
+        nonce = 1u64;
+        let secret_key_0 = [
+            227, 102, 100, 225, 229,  10,  36,  64,
+            122, 107, 115, 225, 109, 250, 167, 226,
+            127, 193,  60, 208,  74,  89, 100,  44,
+            140, 130,  52, 195,  95, 192,  40,  50
+        ];
 
-        //Swap amount 4000 from tokenIndex1 to tokenIndex0 for poolIndex 0, caller is accountIndex 2, reverse is 0
-        origin = 2u64;
-        account_index = 2u32;
-        let mut reverse = 0u8;
-        amount = U256::from(4000);
+        command = [0u8; 81];
+        command[0] = OP_SWAP;
+        command[1..9].copy_from_slice(&nonce.to_be_bytes());
+        command[9..13].copy_from_slice(&account_index.to_be_bytes());
+        command[13..17].copy_from_slice(&pool_index.to_be_bytes());
+        command[17..49].copy_from_slice(&U256::from(reverse).to_be_bytes());
+        command[49..81].copy_from_slice(&amount.to_be_bytes());
+
+        command_sign = BabyJubjub::sign(&command, &secret_key_0);
+        command_sign_formatted = [0 as u8;64];
+        command_sign_formatted[..32].copy_from_slice(&command_sign.r.encode());
+        command_sign_formatted[32..].copy_from_slice(&command_sign.s.encode());
+
+        assert_ok!(SwapModule::swap(Origin::signed(origin), command_sign_formatted, pool_index, reverse, amount, nonce));
+
+		//Swap amount 100 from tokenIndex0 to tokenIndex1 for poolIndex 0, caller is accountIndex 0, reverse is 0
+        amount = U256::from(100);
         nonce = 2u64;
 
         command = [0u8; 81];
@@ -221,37 +283,19 @@ fn multi_supplier_multi_swap_multi_retrieve_small_amount_works() {
         command[17..49].copy_from_slice(&U256::from(reverse).to_be_bytes());
         command[49..81].copy_from_slice(&amount.to_be_bytes());
 
-        command_sign = BabyJubjub::sign(&command, &secret_key_2);
+        command_sign = BabyJubjub::sign(&command, &secret_key_0);
         command_sign_formatted = [0 as u8;64];
         command_sign_formatted[..32].copy_from_slice(&command_sign.r.encode());
         command_sign_formatted[32..].copy_from_slice(&command_sign.s.encode());
 
-        assert_ok!(SwapModule::swap(Origin::signed(origin), command_sign_formatted, pool_index, reverse, amount, nonce));
-        
-		//Swap amount 100 from tokenIndex1 to tokenIndex0 for poolIndex 0, caller is accountIndex 2, reverse is 1
-        reverse = 1u8;
-        amount = U256::from(100);
-        nonce = 3u64;
+        assert_ok!(SwapModule::swap(Origin::signed(origin), command_sign_formatted, pool_index, reverse, amount, nonce));        
 
-        command = [0u8; 81];
-        command[0] = OP_SWAP;
-        command[1..9].copy_from_slice(&nonce.to_be_bytes());
-        command[9..13].copy_from_slice(&account_index.to_be_bytes());
-        command[13..17].copy_from_slice(&pool_index.to_be_bytes());
-        command[17..49].copy_from_slice(&U256::from(reverse).to_be_bytes());
-        command[49..81].copy_from_slice(&amount.to_be_bytes());
-
-        command_sign = BabyJubjub::sign(&command, &secret_key_2);
-        command_sign_formatted = [0 as u8;64];
-        command_sign_formatted[..32].copy_from_slice(&command_sign.r.encode());
-        command_sign_formatted[32..].copy_from_slice(&command_sign.s.encode());
-
-        assert_ok!(SwapModule::swap(Origin::signed(origin), command_sign_formatted, pool_index, reverse, amount, nonce));
-        
-        //PoolRetrieve amount0 21920 and amount1 18236 for poolIndex 0, caller is accountIndex 2
-        amount0 = U256::from(21920u64);
-        amount1 = U256::from(18236u64);
-        nonce = 4u64;
+        //PoolRetrieve amount0 5100 and amount1 4903 for poolIndex 0, caller is accountIndex 2
+        origin = 2u64;
+        account_index = 2u32;
+        amount0 = U256::from(5100);
+        amount1 = U256::from(4903);
+        nonce = 2u64;
 
         command = [0u8; 81];
         command[0] = OP_RETRIEVE;
@@ -268,28 +312,27 @@ fn multi_supplier_multi_swap_multi_retrieve_small_amount_works() {
         
         assert_ok!(SwapModule::pool_retrieve(Origin::signed(origin), command_sign_formatted, pool_index, amount0, amount1, nonce));
 
-        assert_eq!(PoolMap::get(pool_index).unwrap(), (0u32, 1u32, U256::from(22160), U256::from(18437), U256::from(20_209_437_386_569_872_958u128)));
+        assert_eq!(PoolMap::get(pool_index).unwrap(), (0u32, 1u32, U256::from(5100), U256::from(4903), U256::from(5_000_000_000_000_000_000u128)));
 
-        assert_eq!(BalanceMap::get((&account_index, 0u32)), U256::from(28040));
+        assert_eq!(BalanceMap::get((&account_index, 0u32)), U256::from(10100));
 
-        assert_eq!(BalanceMap::get((&account_index, 1u32)), U256::from(31763));
+        assert_eq!(BalanceMap::get((&account_index, 1u32)), U256::from(9903));
 
-        assert_eq!(ShareMap::get((&account_index, &pool_index)), U256::from(9_437_386_569_872_958u128));
+        assert_eq!(ShareMap::get((&account_index, &pool_index)), U256::from(0));
 
-        assert_eq!(NonceMap::<Test>::get(2u64), 5u64);
+        assert_eq!(NonceMap::<Test>::get(2u64), 3u64);
 
-        //PoolRetrieve 10 times, amount0 1 and amount1 0 for poolIndex 0, caller is accountIndex 2
-        //Token0 belongs to accountIndex 2 is 10, accountIndex 2 should get 10
-        let retrieve_times = 10;
-        amount0 = U256::from(1);
-        amount1 = U256::from(0);
-        nonce = 5u64;
+        //PoolSupply 10 times, amount0 10 and amount1 10 for poolIndex 0, caller is accountIndex 2
+        let supply_times = 10;
+        amount0 = U256::from(10);
+        amount1 = U256::from(10);
+        nonce = 3u64;
 
         let mut index = 0;
         command = [0u8; 81];
-        
-        while index < retrieve_times {
-            command[0] = OP_RETRIEVE;
+
+        while index < supply_times {
+            command[0] = OP_SUPPLY;
             command[1..9].copy_from_slice(&nonce.to_be_bytes());
             command[9..13].copy_from_slice(&account_index.to_be_bytes());
             command[13..17].copy_from_slice(&pool_index.to_be_bytes());
@@ -300,21 +343,43 @@ fn multi_supplier_multi_swap_multi_retrieve_small_amount_works() {
             command_sign_formatted = [0 as u8;64];
             command_sign_formatted[..32].copy_from_slice(&command_sign.r.encode());
             command_sign_formatted[32..].copy_from_slice(&command_sign.s.encode());
-            
-            assert_ok!(SwapModule::pool_retrieve(Origin::signed(origin), command_sign_formatted, pool_index, amount0, amount1, nonce));
+
+            assert_ok!(SwapModule::pool_supply(Origin::signed(origin), command_sign_formatted, pool_index, amount0, amount1, nonce));
             
             nonce += 1;
-            index += 1;
+            index += 1; 
         }
- 
-        assert_eq!(PoolMap::get(pool_index).unwrap(), (0u32, 1u32, U256::from(22150), U256::from(18437), U256::from(20_200_317_604_355_716_878u128)));
 
-        assert_eq!(BalanceMap::get((&account_index, 0u32)), U256::from(28050));
+        //PoolRetrieve amount0 5100 and amount1 4906 for poolIndex 0, caller is accountIndex 3
+        origin = 3u64;
+        account_index = 3u32;
+        amount0 = U256::from(5100);
+        amount1 = U256::from(4906);
+        nonce = 2u64;
 
-        assert_eq!(BalanceMap::get((&account_index, 1u32)), U256::from(31763));
+        command = [0u8; 81];
+        command[0] = OP_RETRIEVE;
+        command[1..9].copy_from_slice(&nonce.to_be_bytes());
+        command[9..13].copy_from_slice(&account_index.to_be_bytes());
+        command[13..17].copy_from_slice(&pool_index.to_be_bytes());
+        command[17..49].copy_from_slice(&amount0.to_be_bytes());
+        command[49..81].copy_from_slice(&amount1.to_be_bytes());
 
-        assert_eq!(ShareMap::get((&account_index, &pool_index)), U256::from(317_604_355_716_878u128));
+        command_sign = BabyJubjub::sign(&command, &secret_key_3);
+        command_sign_formatted = [0 as u8;64];
+        command_sign_formatted[..32].copy_from_slice(&command_sign.r.encode());
+        command_sign_formatted[32..].copy_from_slice(&command_sign.s.encode());
+        
+        assert_ok!(SwapModule::pool_retrieve(Origin::signed(origin), command_sign_formatted, pool_index, amount0, amount1, nonce));
 
-        assert_eq!(NonceMap::<Test>::get(2u64), 15u64);
+        assert_eq!(PoolMap::get(pool_index).unwrap(), (0u32, 1u32, U256::from(100), U256::from(97), U256::from(98_039_215_686_274_509u128)));
+
+        assert_eq!(BalanceMap::get((&account_index, 0u32)), U256::from(10100));
+
+        assert_eq!(BalanceMap::get((&account_index, 1u32)), U256::from(9906));
+
+        assert_eq!(ShareMap::get((&account_index, &pool_index)), U256::from(9));
+
+        assert_eq!(NonceMap::<Test>::get(3u64), 3u64);
     })
 }

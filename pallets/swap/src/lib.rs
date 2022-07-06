@@ -517,6 +517,9 @@ decl_module! {
 
             valid_pool_amount(amount0).ok_or(Error::<T>::InvalidAmount)?;
             valid_pool_amount(amount1).ok_or(Error::<T>::InvalidAmount)?;
+            if (amount0 * amount1) == U256::from(0) {
+                return Err(Error::<T>::InvalidAmount)?;
+            }
 
             let (token0, token1, liq0, liq1, _) = PoolMap::get(&pool_index).ok_or(Error::<T>::PoolNotExists)?;
             valid_input_y_amount(liq0, liq1, amount0, amount1, true).ok_or(Error::<T>::InvalidAmountRatio)?;
@@ -533,12 +536,13 @@ decl_module! {
             command[49..81].copy_from_slice(&amount1.to_be_bytes());
             let sign = check_sign::<T>(account_index, &command, &sign)?;
 
+            let amount1_to_pool = calculate_amount1_to_pool::<T>(&pool_index, amount0, amount1, true)?;
             let new_balance_0 = balance_sub::<T>(&account_index, &token0, amount0)?;
-            let new_balance_1 = balance_sub::<T>(&account_index, &token1, amount1)?;
+            let new_balance_1 = balance_sub::<T>(&account_index, &token1, amount1_to_pool)?;
             let share_change = get_share_change::<T>(&pool_index, amount0, true)?;
             let new_share = share_add::<T>(&account_index, &pool_index, share_change)?;
 
-            pool_change_with_share::<T>(&pool_index, true, amount0, true, amount1, share_change)?;
+            pool_change_with_share::<T>(&pool_index, true, amount0, true, amount1_to_pool, share_change)?;
 
             let op = Ops::PoolSupply(sign.0, sign.1, sign.2, nonce, account_index, pool_index, amount0, amount1);
             PendingReqMap::insert(&req_id, op);
@@ -588,14 +592,15 @@ decl_module! {
             command[49..81].copy_from_slice(&amount1.to_be_bytes());
             let sign = check_sign::<T>(account_index, &command, &sign)?;
 
+            let amount1_to_pool = calculate_amount1_to_pool::<T>(&pool_index, amount0, amount1, false)?;
             // for user account
             let new_balance_0 = balance_add::<T>(&account_index, &token0, amount0)?;
-            let new_balance_1 = balance_add::<T>(&account_index, &token1, amount1)?;
+            let new_balance_1 = balance_add::<T>(&account_index, &token1, amount1_to_pool)?;
             let share_change = get_share_change::<T>(&pool_index, amount0, false)?;
             let new_share = share_sub::<T>(&account_index, &pool_index, share_change)?;
 
             // for pool
-            pool_change_with_share::<T>(&pool_index, false, amount0, false, amount1, share_change)?;
+            pool_change_with_share::<T>(&pool_index, false, amount0, false, amount1_to_pool, share_change)?;
 
             let op = Ops::PoolRetrieve(sign.0, sign.1, sign.2, nonce, account_index, pool_index, amount0, amount1);
 

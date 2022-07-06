@@ -41,17 +41,29 @@ mod get_share_change_tests;
 #[path = "tests/unit_tests/helpers/calculate_swap_result_amount_tests.rs"]
 mod calculate_swap_result_amount_tests;
 
+#[path = "tests/unit_tests/helpers/calculate_amount1_to_pool_tests.rs"]
+mod calculate_amount1_to_pool_tests;
+
 #[path = "tests/scenario_tests/single_supplier_multi_swap_retrieve_all_test.rs"]
 mod single_supplier_multi_swap_retrieve_all_test;
 
-#[path = "tests/scenario_tests/multi_supplier_multi_swap_cannot_retrieve_all_test.rs"]
-mod multi_supplier_multi_swap_cannot_retrieve_all_test;
+#[path = "tests/scenario_tests/multi_supplier_multi_swap_cannot_retrieve_all_swap_after_supply_test.rs"]
+mod multi_supplier_multi_swap_cannot_retrieve_all_swap_after_supply_test;
 
-#[path = "tests/scenario_tests/multi_supplier_multi_swap_retrieve_all_test.rs"]
-mod multi_supplier_multi_swap_retrieve_all_test;
+#[path = "tests/scenario_tests/multi_supplier_multi_swap_cannot_retrieve_all_swap_not_after_supply_test.rs"]
+mod multi_supplier_multi_swap_cannot_retrieve_all_swap_not_after_supply_test;
 
-#[path = "tests/scenario_tests/multi_supplier_multi_swap_multi_supply_small_amount_test.rs"]
-mod multi_supplier_multi_swap_multi_supply_small_amount_test;
+#[path = "tests/scenario_tests/multi_supplier_multi_swap_retrieve_all_swap_after_supply_test.rs"]
+mod multi_supplier_multi_swap_retrieve_all_swap_after_supply_test;
+
+#[path = "tests/scenario_tests/multi_supplier_multi_swap_retrieve_all_swap_not_after_supply_test.rs"]
+mod multi_supplier_multi_swap_retrieve_all_swap_not_after_supply_test;
+
+#[path = "tests/scenario_tests/multi_supplier_multi_swap_multi_supply_small_amount_retrieve_all_test.rs"]
+mod multi_supplier_multi_swap_multi_supply_small_amount_retrieve_all_test;
+
+#[path = "tests/scenario_tests/multi_supplier_multi_swap_multi_supply_small_amount_not_retrieve_all_test.rs"]
+mod multi_supplier_multi_swap_multi_supply_small_amount_not_retrieve_all_test;
 
 #[path = "tests/scenario_tests/multi_supplier_multi_swap_multi_retrieve_small_amount_test.rs"]
 mod multi_supplier_multi_swap_multi_retrieve_small_amount_test;
