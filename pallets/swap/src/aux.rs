@@ -258,6 +258,34 @@ pub fn calculate_swap_result_amount<T: Config>(
     return Ok(result_amount);
 }
 
+pub fn calculate_amount1_to_pool<T: Config>(
+    pool_index: &PoolIndex,
+    amount0: Amount,
+    amount1: Amount,
+    is_supply: bool
+) -> Result<Amount, Error<T>> {
+    let (_, _, liq0, liq1, _) = PoolMap::get(pool_index).ok_or(Error::<T>::PoolNotExists)?;
+
+    if liq0 == U256::from(0) {
+        return Ok(amount1);
+    }
+
+    let dividend = amount0.checked_mul_on_circuit(liq1).ok_or(Error::<T>::InternalCalcOverflow)?;
+    let quotient = dividend.checked_div_on_circuit(liq0).ok_or(Error::<T>::InternalCalcOverflow)?;
+    let rem = dividend.checked_rem_on_circuit(liq0).ok_or(Error::<T>::InternalCalcOverflow)?;
+
+    let amount1_to_pool = if is_supply {
+        if rem == U256::from(0) {
+            quotient
+        } else {
+            quotient + 1
+        }
+    } else {
+        quotient
+    };
+    return Ok(amount1_to_pool);
+}
+
 pub fn valid_pool_amount(
     amount: Amount
 ) -> Option<U256> {

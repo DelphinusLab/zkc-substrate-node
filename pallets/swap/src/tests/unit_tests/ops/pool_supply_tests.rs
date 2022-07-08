@@ -249,15 +249,15 @@ fn pool_supply_account_not_exists() {
 }
 
 #[test]
-fn pool_supply_invalid_amount() {
+fn pool_supply_invalid_amount_amount0_exceeds_range() {
     new_test_ext().execute_with(|| {
         prepare_unit_test();
 
-        //PoolSupply amount0 U256::from(1) << 99 + 1 and amount1 1000 for poolIndex 0, caller is accountIndex 2
+        //PoolSupply amount0 U256::from(1) << 99 and amount1 1000 for poolIndex 0, caller is accountIndex 2
         let origin = 2u64;
         let account_index = 2u32;
         let pool_index = 0u32;
-        //U256::from(1) << 125 exceeds the range 99 bits
+        //U256::from(1) << 99 exceeds the range 99 bits
         let amount0 = U256::from(1) << 99;
         let amount1 = U256::from(1000);
         let nonce = 1u64;
@@ -282,6 +282,81 @@ fn pool_supply_invalid_amount() {
         command_sign_formatted[32..].copy_from_slice(&command_sign.s.encode());
 
         assert_noop!(SwapModule::pool_supply(Origin::signed(origin), command_sign_formatted, pool_index, amount0, amount1, nonce), Error::<Test>::InvalidAmount);
+    })
+}
+
+#[test]
+fn pool_supply_invalid_amount_amount1_exceeds_range() {
+    new_test_ext().execute_with(|| {
+        prepare_unit_test();
+
+        //PoolSupply amount0 1000 and amount1 U256::from(1) < 99 for poolIndex 0, caller is accountIndex 2
+        let origin = 2u64;
+        let account_index = 2u32;
+        let pool_index = 0u32;
+        let amount0 = U256::from(1000);
+        //U256::from(1) << 99 exceeds the range 99 bits
+        let amount1 = U256::from(1) << 99;
+        let nonce = 1u64;
+        let secret_key_2 = [
+            210, 199, 164, 130,  20, 202,  75,  82,
+            215,  24,   9, 195,  86, 213, 230,  20,
+            159, 219, 169, 225,  93, 193, 109, 240,
+            185, 222, 254,  50, 115,  63,  97, 179
+        ];
+
+        let mut command = [0u8; 81];
+        command[0] = OP_SUPPLY;
+        command[1..9].copy_from_slice(&nonce.to_be_bytes());
+        command[9..13].copy_from_slice(&account_index.to_be_bytes());
+        command[13..17].copy_from_slice(&pool_index.to_be_bytes());
+        command[17..49].copy_from_slice(&amount0.to_be_bytes());
+        command[49..81].copy_from_slice(&amount1.to_be_bytes());
+
+        let command_sign = BabyJubjub::sign(&command, &secret_key_2);
+        let mut command_sign_formatted :[u8; 64] = [0 as u8;64];
+        command_sign_formatted[..32].copy_from_slice(&command_sign.r.encode());
+        command_sign_formatted[32..].copy_from_slice(&command_sign.s.encode());
+
+        assert_noop!(SwapModule::pool_supply(Origin::signed(origin), command_sign_formatted, pool_index, amount0, amount1, nonce), Error::<Test>::InvalidAmount);
+    })
+}
+
+#[test]
+fn pool_supply_invalid_amount_amount0_mul_amount1_is_zero() {
+    new_test_ext().execute_with(|| {
+        prepare_unit_test();
+
+        //PoolSupply amount0 0 and amount1 1500 for poolIndex 0, caller is accountIndex 2
+        let origin = 2u64;
+        let account_index = 2u32;
+        let pool_index = 0u32;
+        // amount0 * amount1 is zero
+        let amount0 = U256::from(0);
+        let amount1 = U256::from(1500);
+        let nonce = 1u64;
+        let secret_key_2 = [
+            210, 199, 164, 130,  20, 202,  75,  82,
+            215,  24,   9, 195,  86, 213, 230,  20,
+            159, 219, 169, 225,  93, 193, 109, 240,
+            185, 222, 254,  50, 115,  63,  97, 179
+        ];
+
+        let mut command = [0u8; 81];
+        command[0] = OP_SUPPLY;
+        command[1..9].copy_from_slice(&nonce.to_be_bytes());
+        command[9..13].copy_from_slice(&account_index.to_be_bytes());
+        command[13..17].copy_from_slice(&pool_index.to_be_bytes());
+        command[17..49].copy_from_slice(&amount0.to_be_bytes());
+        command[49..81].copy_from_slice(&amount1.to_be_bytes());
+
+        let command_sign = BabyJubjub::sign(&command, &secret_key_2);
+        let mut command_sign_formatted :[u8; 64] = [0 as u8;64];
+        command_sign_formatted[..32].copy_from_slice(&command_sign.r.encode());
+        command_sign_formatted[32..].copy_from_slice(&command_sign.s.encode());
+
+        assert_noop!(SwapModule::pool_supply(Origin::signed(origin), command_sign_formatted, pool_index, amount0, amount1, nonce), Error::<Test>::InvalidAmount);
+
     })
 }
 
@@ -432,7 +507,6 @@ fn pool_supply_balance_not_enough() {
         command_sign_formatted[32..].copy_from_slice(&command_sign.s.encode());
 
         assert_noop!(SwapModule::pool_supply(Origin::signed(origin), command_sign_formatted, pool_index, amount0, amount1, nonce), Error::<Test>::BalanceNotEnough);
-
     })
 }
 
@@ -490,6 +564,5 @@ fn pool_supply_y_amount_invalid() {
         command_sign_formatted[32..].copy_from_slice(&command_sign.s.encode());
 
         assert_noop!(SwapModule::pool_supply(Origin::signed(origin), command_sign_formatted, pool_index, amount0, amount1, nonce), Error::<Test>::InvalidAmountRatio);
-
     })
 }
