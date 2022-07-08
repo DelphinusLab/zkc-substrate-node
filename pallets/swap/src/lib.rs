@@ -33,6 +33,8 @@ pub trait Config: frame_system::Config {
 type BalanceOf<T> =
     <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 
+// Initial 1 / sharePrice is 10 ^ 15
+const ORDER_OF_MAGNITUDE: usize = 15usize;
 const PENDING: u8 = 1u8;
 const DONE: u8 = 2u8;
 
@@ -209,7 +211,7 @@ decl_storage! {
 
         pub BalanceMap get(fn balance_map): map hasher(blake2_128_concat) (AccountIndex, TokenIndex) => Amount;
         pub ShareMap get(fn share_map): map hasher(blake2_128_concat) (AccountIndex, PoolIndex) => Amount;
-        pub PoolMap get(fn pool_map): map hasher(blake2_128_concat) PoolIndex => Option<(TokenIndex, TokenIndex, Amount, Amount)>;
+        pub PoolMap get(fn pool_map): map hasher(blake2_128_concat) PoolIndex => Option<(TokenIndex, TokenIndex, Amount, Amount, Amount)>;
 
         /* Owner * bid * CurrentWinner */
         pub NFTMap get(fn nft_map): map hasher(blake2_128_concat) NFTId => (AccountIndex, Amount, Option<AccountIndex>);
@@ -448,13 +450,22 @@ decl_module! {
             let account = who;
             let account_index = get_account_index::<T>(&account)?;
 
-            amount.valid_on_circuit().ok_or(Error::<T>::InvalidAmount)?;
+            if amount == U256::from(0) {
+                return Err(Error::<T>::InvalidAmount)?;
+            }
+            valid_pool_amount(amount).ok_or(Error::<T>::InvalidAmount)?;
 
             let req_id = req_id_get::<T>()?;
             let new_nonce = nonce_check::<T>(&account, nonce)?;
 
-            let (token0, token1, _, _) = PoolMap::get(&pool_index).ok_or(Error::<T>::PoolNotExists)?;
-            let (token0, token1) = if reverse == 0u8 { (token0, token1) } else { (token1, token0) };
+            let ((token_input, amount_input), (token_output, amount_output)) = {
+                let (token0, token1, amount0, amount1, _) = PoolMap::get(&pool_index).ok_or(Error::<T>::PoolNotExists)?;
+                if reverse == 0u8 {
+                    ((token0, amount0), (token1, amount1))
+                } else {
+                    ((token1, amount1), (token0, amount0))
+                }
+            };
 
             let mut command = [0u8; 81];
             command[0] = OP_SWAP;
@@ -465,18 +476,20 @@ decl_module! {
             command[49..81].copy_from_slice(&amount.to_be_bytes());
             let sign = check_sign::<T>(account_index, &command, &sign)?;
 
-            let new_balance_from = balance_sub::<T>(&account_index, &token0, amount)?;
-            let new_balance_to = balance_add::<T>(&account_index, &token1, amount)?;
+            let result_amount = calculate_swap_result_amount::<T>(amount_input, amount_output, amount)?;
 
-            pool_change::<T>(&pool_index, reverse == 0, amount, reverse != 0, amount)?;
+            let new_balance_input = balance_sub::<T>(&account_index, &token_input, amount)?;
+            let new_balance_output = balance_add::<T>(&account_index, &token_output, result_amount)?;
+
+            pool_change::<T>(&pool_index, reverse == 0, if reverse == 0 {amount} else {result_amount}, reverse != 0, if reverse == 0 {result_amount} else {amount})?;
 
             let op = Ops::Swap(sign.0, sign.1, sign.2, nonce, account_index, pool_index, reverse, amount);
 
             PendingReqMap::insert(&req_id, op);
             ReqIndex::put(req_id);
 
-            balance_set(&account_index, &token0, new_balance_from);
-            balance_set(&account_index, &token1, new_balance_to);
+            balance_set(&account_index, &token_input, new_balance_input);
+            balance_set(&account_index, &token_output, new_balance_output);
             NonceMap::<T>::insert(&account, new_nonce);
 
             Self::deposit_event(
@@ -502,10 +515,14 @@ decl_module! {
             let account = who;
             let account_index = get_account_index::<T>(&account)?;
 
-            amount0.valid_on_circuit().ok_or(Error::<T>::InvalidAmount)?;
-            amount1.valid_on_circuit().ok_or(Error::<T>::InvalidAmount)?;
+            valid_pool_amount(amount0).ok_or(Error::<T>::InvalidAmount)?;
+            valid_pool_amount(amount1).ok_or(Error::<T>::InvalidAmount)?;
+            if (amount0 * amount1) == U256::from(0) {
+                return Err(Error::<T>::InvalidAmount)?;
+            }
 
-            let (token0, token1, _, _) = PoolMap::get(&pool_index).ok_or(Error::<T>::PoolNotExists)?;
+            let (token0, token1, liq0, liq1, _) = PoolMap::get(&pool_index).ok_or(Error::<T>::PoolNotExists)?;
+            valid_input_y_amount(liq0, liq1, amount0, amount1, true).ok_or(Error::<T>::InvalidAmountRatio)?;
 
             let req_id = req_id_get::<T>()?;
             let new_nonce = nonce_check::<T>(&account, nonce)?;
@@ -519,19 +536,25 @@ decl_module! {
             command[49..81].copy_from_slice(&amount1.to_be_bytes());
             let sign = check_sign::<T>(account_index, &command, &sign)?;
 
-            let new_balance_from = balance_sub::<T>(&account_index, &token0, amount0)?;
-            let new_balance_to = balance_sub::<T>(&account_index, &token1, amount1)?;
-            let new_share = share_add::<T>(&account_index, &pool_index, amount0.checked_add_on_circuit(amount1).ok_or(Error::<T>::ShareOverflow)?)?;
+            let amount1_to_pool = if is_pool_empty(&pool_index) {
+                amount1
+            } else {
+                calculate_amount1_to_pool::<T>(&pool_index, amount0, true)?
+            };
+            let new_balance_0 = balance_sub::<T>(&account_index, &token0, amount0)?;
+            let new_balance_1 = balance_sub::<T>(&account_index, &token1, amount1_to_pool)?;
+            let share_change = get_share_change::<T>(&pool_index, amount0, true)?;
+            let new_share = share_add::<T>(&account_index, &pool_index, share_change)?;
 
-            pool_change::<T>(&pool_index, true, amount0, true, amount1)?;
+            pool_change_with_share::<T>(&pool_index, true, amount0, true, amount1_to_pool, share_change)?;
 
             let op = Ops::PoolSupply(sign.0, sign.1, sign.2, nonce, account_index, pool_index, amount0, amount1);
             PendingReqMap::insert(&req_id, op);
             ReqIndex::put(req_id);
 
-            balance_set(&account_index, &token0, new_balance_from);
-            balance_set(&account_index, &token1, new_balance_to);
-            ShareMap::insert((&account_index, pool_index), new_share);
+            balance_set(&account_index, &token0, new_balance_0);
+            balance_set(&account_index, &token1, new_balance_1);
+            ShareMap::insert((&account_index, &pool_index), new_share);
             NonceMap::<T>::insert(&account, new_nonce);
 
             Self::deposit_event(
@@ -555,10 +578,11 @@ decl_module! {
             let account = who;
             let account_index = get_account_index::<T>(&account)?;
 
-            amount0.valid_on_circuit().ok_or(Error::<T>::InvalidAmount)?;
-            amount1.valid_on_circuit().ok_or(Error::<T>::InvalidAmount)?;
+            valid_pool_amount(amount0).ok_or(Error::<T>::InvalidAmount)?;
+            valid_pool_amount(amount1).ok_or(Error::<T>::InvalidAmount)?;
 
-            let (token0, token1, _, _) = PoolMap::get(&pool_index).ok_or(Error::<T>::PoolNotExists)?;
+            let (token0, token1, liq0, liq1, _) = PoolMap::get(&pool_index).ok_or(Error::<T>::PoolNotExists)?;
+            valid_input_y_amount(liq0, liq1, amount0, amount1, false).ok_or(Error::<T>::InvalidAmountRatio)?;
 
             let req_id = req_id_get::<T>()?;
             let new_nonce = nonce_check::<T>(&account, nonce)?;
@@ -573,20 +597,22 @@ decl_module! {
             let sign = check_sign::<T>(account_index, &command, &sign)?;
 
             // for user account
-            let new_balance_from = balance_add::<T>(&account_index, &token0, amount0)?;
-            let new_balance_to = balance_add::<T>(&account_index, &token1, amount1)?;
-            let new_share = share_sub::<T>(&account_index, &pool_index, amount0.checked_add_on_circuit(amount1).ok_or(Error::<T>::ShareNotEnough)?)?;
+            let amount1_to_pool = calculate_amount1_to_pool::<T>(&pool_index, amount0, false)?;
+            let new_balance_0 = balance_add::<T>(&account_index, &token0, amount0)?;
+            let new_balance_1 = balance_add::<T>(&account_index, &token1, amount1_to_pool)?;
+            let share_change = get_share_change::<T>(&pool_index, amount0, false)?;
+            let new_share = share_sub::<T>(&account_index, &pool_index, share_change)?;
 
             // for pool
-            pool_change::<T>(&pool_index, false, amount0, false, amount1)?;
+            pool_change_with_share::<T>(&pool_index, false, amount0, false, amount1_to_pool, share_change)?;
 
             let op = Ops::PoolRetrieve(sign.0, sign.1, sign.2, nonce, account_index, pool_index, amount0, amount1);
 
             PendingReqMap::insert(&req_id, op);
             ReqIndex::put(req_id);
 
-            balance_set(&account_index, &token0, new_balance_from);
-            balance_set(&account_index, &token1, new_balance_to);
+            balance_set(&account_index, &token0, new_balance_0);
+            balance_set(&account_index, &token1, new_balance_1);
             ShareMap::insert((&account_index, &pool_index), new_share);
             NonceMap::<T>::insert(&account, new_nonce);
 

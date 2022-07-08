@@ -72,6 +72,7 @@ pub fn create_pool_index<T: Config>(
             token_dst_index.clone(),
             U256::from(0),
             U256::from(0),
+            U256::from(0)
         ),
     );
     return Ok(index);
@@ -113,7 +114,7 @@ pub fn pool_change<T: Config>(
     is_add_1: bool,
     change_1: Amount,
 ) -> Result<(Amount, Amount), Error<T>> {
-    let (token_index_0, token_index_1, amount_0, amount_1) =
+    let (token_index_0, token_index_1, amount_0, amount_1, total_share) =
         PoolMap::get(pool_index).ok_or(Error::<T>::PoolNotExists)?;
     let new_amount_0 = if is_add_0 {
         amount_0
@@ -135,9 +136,53 @@ pub fn pool_change<T: Config>(
     };
     PoolMap::insert(
         pool_index,
-        (token_index_0, token_index_1, new_amount_0, new_amount_1),
+        (token_index_0, token_index_1, new_amount_0, new_amount_1, total_share)
     );
     return Ok((new_amount_0, new_amount_1));
+}
+
+pub fn pool_change_with_share<T: Config>(
+    pool_index: &PoolIndex,
+    is_add_0: bool,
+    change_0: Amount,
+    is_add_1: bool,
+    change_1: Amount,
+    amount: Amount
+) -> Result<(Amount, Amount, Amount), Error<T>> {
+    let (token_index_0, token_index_1, amount_0, amount_1, total_share) =
+        PoolMap::get(pool_index).ok_or(Error::<T>::PoolNotExists)?;
+    let new_amount_0 = if is_add_0 {
+        amount_0
+            .checked_add_on_circuit(change_0)
+            .ok_or(Error::<T>::PoolBalanceOverflow)?
+    } else {
+        amount_0
+            .checked_sub(change_0)
+            .ok_or(Error::<T>::PoolBalanceNotEnough)?
+    };
+    let new_amount_1 = if is_add_1 {
+        amount_1
+            .checked_add_on_circuit(change_1)
+            .ok_or(Error::<T>::PoolBalanceOverflow)?
+    } else {
+        amount_1
+            .checked_sub(change_1)
+            .ok_or(Error::<T>::PoolBalanceNotEnough)?
+    };
+    let total_share_new = if is_add_0 {
+        total_share
+            .checked_add_on_circuit(amount)
+            .ok_or(Error::<T>::ShareOverflow)?
+    } else {
+        total_share
+            .checked_sub(amount)
+            .ok_or(Error::<T>::ShareNotEnough)?
+    };
+    PoolMap::insert(
+        pool_index,
+        (token_index_0, token_index_1, new_amount_0, new_amount_1, total_share_new)
+    );
+    return Ok((new_amount_0, new_amount_1, total_share_new));
 }
 
 /* ---- Share ---- */
@@ -161,6 +206,121 @@ pub fn share_sub<T: Config>(
         .checked_sub(amount)
         .ok_or(Error::<T>::ShareNotEnough)?;
     return Ok(new_amount);
+}
+
+pub fn get_share_change<T: Config>(
+    pool_index: &PoolIndex,
+    amount: Amount,
+    is_supply: bool
+) -> Result<Amount, Error<T>>{
+    let (_, _, liq0, _, total_share) = PoolMap::get(pool_index).ok_or(Error::<T>::PoolNotExists)?;
+
+    valid_pool_amount(amount).ok_or(Error::<T>::InvalidAmount)?;
+
+    let share_change = if is_supply {
+        if is_pool_empty(pool_index) {
+            let initial_amount = amount.checked_mul_on_circuit(U256::exp10(ORDER_OF_MAGNITUDE)).ok_or(Error::<T>::InternalCalcOverflow)?;
+            initial_amount
+        } else {
+            let dividend = amount.checked_mul_on_circuit(total_share).ok_or(Error::<T>::InternalCalcOverflow)?;
+            let divisor = liq0;
+            let result = dividend.checked_div_on_circuit(divisor).ok_or(Error::<T>::InternalCalcOverflow)?;
+            result
+        }
+    } else {
+        let dividend = amount.checked_mul_on_circuit(total_share).ok_or(Error::<T>::InternalCalcOverflow)?;
+        let divisor = liq0;
+        let share = dividend.checked_div_on_circuit(divisor).ok_or(Error::<T>::InternalCalcOverflow)?;
+        let rem = dividend.checked_rem_on_circuit(divisor).ok_or(Error::<T>::InternalCalcOverflow)?;
+
+        if rem != U256::from(0) {
+            share + 1
+        } else {
+            share
+        }
+    };
+    return Ok(share_change);
+}
+
+pub fn calculate_swap_result_amount<T: Config>(
+    amount_input: Amount,
+    amount_output: Amount,
+    amount: Amount
+) -> Result<Amount, Error<T>> {
+    valid_pool_amount(amount_input).ok_or(Error::<T>::InvalidAmount)?;
+    valid_pool_amount(amount_output).ok_or(Error::<T>::InvalidAmount)?;
+    valid_pool_amount(amount).ok_or(Error::<T>::InvalidAmount)?;
+
+    // swap rate is almost equal to 0.3%(1021/1024 for convenience in circom)
+    let dividend: Amount = amount_output.checked_mul_on_circuit(amount).ok_or(Error::<T>::InternalCalcOverflow)?.checked_mul_on_circuit(U256::from(1021)).ok_or(Error::<T>::InternalCalcOverflow)?;
+    let divisor: Amount = (amount_input + amount).checked_mul_on_circuit(U256::from(1024)).ok_or(Error::<T>::InternalCalcOverflow)?;
+    let result_amount = dividend.checked_div_on_circuit(divisor).ok_or(Error::<T>::InternalCalcOverflow)?;
+    return Ok(result_amount);
+}
+
+pub fn calculate_amount1_to_pool<T: Config>(
+    pool_index: &PoolIndex,
+    amount0: Amount,
+    is_supply: bool
+) -> Result<Amount, Error<T>> {
+    let (_, _, liq0, liq1, _) = PoolMap::get(pool_index).ok_or(Error::<T>::PoolNotExists)?;
+
+    let dividend = amount0.checked_mul_on_circuit(liq1).ok_or(Error::<T>::InternalCalcOverflow)?;
+    let quotient = dividend.checked_div_on_circuit(liq0).ok_or(Error::<T>::InternalCalcOverflow)?;
+    let rem = dividend.checked_rem_on_circuit(liq0).ok_or(Error::<T>::InternalCalcOverflow)?;
+
+    let amount1_to_pool = if is_supply {
+        if rem == U256::from(0) {
+            quotient
+        } else {
+            quotient + 1
+        }
+    } else {
+        quotient
+    };
+    return Ok(amount1_to_pool);
+}
+
+pub fn is_pool_empty (
+    pool_index: &PoolIndex
+) -> bool {
+    let (_, _, liq0, _, _) = PoolMap::get(pool_index).unwrap();
+    liq0 == U256::from(0)
+}
+
+pub fn valid_pool_amount(
+    amount: Amount
+) -> Option<U256> {
+    let maximum = U256::from(1u64) << 99;
+    match amount >= maximum {
+        true => None,
+        false => Some(amount),
+    }
+}
+
+pub fn valid_input_y_amount(
+    liq0: Amount,
+    liq1: Amount,
+    input_x: Amount,
+    input_y: Amount,
+    is_supply: bool
+) -> Option<U256> {
+    let validation: bool;
+    let input_y_mul_liq0 = input_y.checked_mul_on_circuit(liq0);
+    let input_x_mul_liq1 = input_x.checked_mul_on_circuit(liq1);
+    if input_y_mul_liq0.is_some() && input_x_mul_liq1.is_some() {
+        if is_supply {
+            validation = input_y_mul_liq0 >= input_x_mul_liq1;
+        } else {
+            validation = input_y_mul_liq0 <= input_x_mul_liq1;
+        }
+    } else {
+        validation = false;
+    }
+    match validation {
+        true => Some(input_y),
+        false => None,
+    }
 }
 
 /* --- NFT --- */
@@ -301,12 +461,36 @@ impl U256ToByte for U256 {
 
 pub trait CircuitRange<T> {
     fn checked_add_on_circuit(&self, rhs: T) -> Option<T>;
+    fn checked_mul_on_circuit(&self, rhs: T) -> Option<T>;
+    fn checked_div_on_circuit(&self, rhs: T) -> Option<T>;
+    fn checked_rem_on_circuit(&self, rhs: T) -> Option<T>;
     fn valid_on_circuit(&self) -> Option<T>;
 }
 
 impl CircuitRange<U256> for U256 {
     fn checked_add_on_circuit(&self, rhs: U256) -> Option<U256> {
         match self.checked_add(rhs) {
+            None => None,
+            Some(res) => res.valid_on_circuit(),
+        }
+    }
+
+    fn checked_mul_on_circuit(&self, rhs: U256) -> Option<U256> {
+        match self.checked_mul(rhs) {
+            None => None,
+            Some(res) => res.valid_on_circuit(),
+        }
+    }
+
+    fn checked_div_on_circuit(&self, rhs: U256) -> Option<U256> {
+        match self.checked_div(rhs) {
+            None => None,
+            Some(res) => res.valid_on_circuit(),
+        }
+    }
+
+    fn checked_rem_on_circuit(&self, rhs: U256) -> Option<U256> {
+        match self.checked_rem(rhs) {
             None => None,
             Some(res) => res.valid_on_circuit(),
         }
