@@ -99,12 +99,12 @@ fn prepare_unit_test() {
 }
 
 #[test]
-fn pool_supply_works_share_is_zero() {
+fn pool_supply_works_old_amount0_is_zero() {
     new_test_ext().execute_with(|| {
         prepare_unit_test();
 
         //PoolSupply amount0 1000 and amount1 1000 for poolIndex 0, caller is accountIndex 2
-        //Share of accountIndex 2 is 0
+        //Old amount0 in pool is 0
         let origin = 2u64;
         let account_index = 2u32;
         let pool_index = 0u32;
@@ -146,7 +146,7 @@ fn pool_supply_works_share_is_zero() {
 }
 
 #[test]
-fn pool_supply_works_share_is_not_zero() {
+fn pool_supply_works_old_amount0_is_not_zero() {
     new_test_ext().execute_with(|| {
         prepare_unit_test();
 
@@ -180,7 +180,7 @@ fn pool_supply_works_share_is_not_zero() {
         assert_ok!(SwapModule::pool_supply(Origin::signed(origin), command_sign_formatted, pool_index, amount0, amount1, nonce));
 
         //PoolSupply amount0 1000 and amount1 1000 for poolIndex 0, caller is accountIndex 2
-        //Share of accountIndex 2 is not 0
+        //Old amount0 in pool is not 0
         nonce = 2u64;
 
         let mut command = [0u8; 81];

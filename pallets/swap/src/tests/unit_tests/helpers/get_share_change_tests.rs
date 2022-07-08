@@ -21,11 +21,11 @@ fn prepare_unit_test() {
 }
 
 #[test]
-fn get_share_change_works_is_supply_share_is_zero() {
+fn get_share_change_works_is_supply_old_amount0_is_zero() {
     new_test_ext().execute_with(|| {
         prepare_unit_test();
 
-        //GetShareChange if is_supply is true, original total share is zero
+        //GetShareChange if is_supply is true, original amount0 is zero
         let pool_index = 0u32;
         let amount = U256::from(1000);
         let is_supply = true;
@@ -37,7 +37,7 @@ fn get_share_change_works_is_supply_share_is_zero() {
 }
 
 #[test]
-fn get_share_change_works_is_supply_share_is_not_zero() {
+fn get_share_change_works_is_supply_old_amount0_is_not_zero() {
     new_test_ext().execute_with(|| {
         //PoolMap insert new value
         let pool_index = 0u32;
@@ -57,7 +57,7 @@ fn get_share_change_works_is_supply_share_is_not_zero() {
             ),
         );
 
-        //GetShareChange if is_supply is true, original total share is not zero
+        //GetShareChange if is_supply is true, original amount0 is not zero
         let amount = U256::from(1000);
         let is_supply = true;
 
