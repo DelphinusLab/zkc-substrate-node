@@ -536,7 +536,11 @@ decl_module! {
             command[49..81].copy_from_slice(&amount1.to_be_bytes());
             let sign = check_sign::<T>(account_index, &command, &sign)?;
 
-            let amount1_to_pool = calculate_amount1_to_pool::<T>(&pool_index, amount0, amount1, true)?;
+            let amount1_to_pool = if is_pool_empty(&pool_index) {
+                amount1
+            } else {
+                calculate_amount1_to_pool::<T>(&pool_index, amount0, true)?
+            };
             let new_balance_0 = balance_sub::<T>(&account_index, &token0, amount0)?;
             let new_balance_1 = balance_sub::<T>(&account_index, &token1, amount1_to_pool)?;
             let share_change = get_share_change::<T>(&pool_index, amount0, true)?;
@@ -592,8 +596,8 @@ decl_module! {
             command[49..81].copy_from_slice(&amount1.to_be_bytes());
             let sign = check_sign::<T>(account_index, &command, &sign)?;
 
-            let amount1_to_pool = calculate_amount1_to_pool::<T>(&pool_index, amount0, amount1, false)?;
             // for user account
+            let amount1_to_pool = calculate_amount1_to_pool::<T>(&pool_index, amount0, false)?;
             let new_balance_0 = balance_add::<T>(&account_index, &token0, amount0)?;
             let new_balance_1 = balance_add::<T>(&account_index, &token1, amount1_to_pool)?;
             let share_change = get_share_change::<T>(&pool_index, amount0, false)?;

@@ -213,23 +213,23 @@ pub fn get_share_change<T: Config>(
     amount: Amount,
     is_supply: bool
 ) -> Result<Amount, Error<T>>{
-    let (_, _, amount0, _, total_share) = PoolMap::get(pool_index).ok_or(Error::<T>::PoolNotExists)?;
+    let (_, _, liq0, _, total_share) = PoolMap::get(pool_index).ok_or(Error::<T>::PoolNotExists)?;
 
     valid_pool_amount(amount).ok_or(Error::<T>::InvalidAmount)?;
 
     let share_change = if is_supply {
-        if total_share != U256::from(0) {
-            let dividend = amount.checked_mul_on_circuit(total_share).ok_or(Error::<T>::InternalCalcOverflow)?;
-            let divisor = amount0;
-            let result = dividend.checked_div_on_circuit(divisor).ok_or(Error::<T>::InternalCalcOverflow)?;
-            result
-        } else {
+        if is_pool_empty(pool_index) {
             let initial_amount = amount.checked_mul_on_circuit(U256::exp10(ORDER_OF_MAGNITUDE)).ok_or(Error::<T>::InternalCalcOverflow)?;
             initial_amount
+        } else {
+            let dividend = amount.checked_mul_on_circuit(total_share).ok_or(Error::<T>::InternalCalcOverflow)?;
+            let divisor = liq0;
+            let result = dividend.checked_div_on_circuit(divisor).ok_or(Error::<T>::InternalCalcOverflow)?;
+            result
         }
     } else {
         let dividend = amount.checked_mul_on_circuit(total_share).ok_or(Error::<T>::InternalCalcOverflow)?;
-        let divisor = amount0;
+        let divisor = liq0;
         let share = dividend.checked_div_on_circuit(divisor).ok_or(Error::<T>::InternalCalcOverflow)?;
         let rem = dividend.checked_rem_on_circuit(divisor).ok_or(Error::<T>::InternalCalcOverflow)?;
 
@@ -261,14 +261,9 @@ pub fn calculate_swap_result_amount<T: Config>(
 pub fn calculate_amount1_to_pool<T: Config>(
     pool_index: &PoolIndex,
     amount0: Amount,
-    amount1: Amount,
     is_supply: bool
 ) -> Result<Amount, Error<T>> {
     let (_, _, liq0, liq1, _) = PoolMap::get(pool_index).ok_or(Error::<T>::PoolNotExists)?;
-
-    if liq0 == U256::from(0) {
-        return Ok(amount1);
-    }
 
     let dividend = amount0.checked_mul_on_circuit(liq1).ok_or(Error::<T>::InternalCalcOverflow)?;
     let quotient = dividend.checked_div_on_circuit(liq0).ok_or(Error::<T>::InternalCalcOverflow)?;
@@ -284,6 +279,13 @@ pub fn calculate_amount1_to_pool<T: Config>(
         quotient
     };
     return Ok(amount1_to_pool);
+}
+
+pub fn is_pool_empty (
+    pool_index: &PoolIndex
+) -> bool {
+    let (_, _, liq0, _, _) = PoolMap::get(pool_index).unwrap();
+    liq0 == U256::from(0)
 }
 
 pub fn valid_pool_amount(

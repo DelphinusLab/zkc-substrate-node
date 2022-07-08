@@ -396,7 +396,7 @@ fn pool_retrieve_balance_overflow() {
 
 
         //PoolRetrieve amount0 500 and amount1 500 for poolIndex 0, caller is accountIndex 2
-        //After poolTrieve here, balance exceeds the range250 bits
+        //After pool retrieve here, balance exceeds the range250 bits
         origin = 2u64;
         account_index = 2u32;
         let pool_index = 0u32;
