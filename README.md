@@ -22,3 +22,7 @@ Run `./deploy/deploy.sh -h` for more options.
 DOCKER_BUILDKIT=1 docker build . -t zhenxunge-node
 docker-compose -f deploy/dev/docker-compose.yml up
 ```
+
+## How to run unit test
+run `cargo test -- --nocapture` in pallets/swap.
+For more detail, please check the README in pallets/swap/tests
