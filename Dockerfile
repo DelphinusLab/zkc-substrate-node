@@ -21,6 +21,9 @@ RUN useradd -m -u 1000 -U -s /bin/sh -d /delphinuslab delphinuslab && \
 	/usr/local/bin/node-swap --version
 
 USER delphinuslab
+# Insert session key
+Run	/usr/local/bin/node-swap key insert --chain dev --scheme Ed25519 --suri //Eve//stash --key-type gran && \
+	/usr/local/bin/node-swap key insert --chain dev --scheme Sr25519 --suri //Eve//stash --key-type aura
 EXPOSE 30333 9933 9944 9615
 VOLUME ["/data"]
 ENTRYPOINT ["/usr/local/bin/node-swap"]

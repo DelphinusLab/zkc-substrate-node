@@ -8,6 +8,10 @@ use sp_finality_grandpa::AuthorityId as GrandpaId;
 use sp_runtime::traits::{Verify, IdentifyAccount};
 use sc_service::ChainType;
 
+#[path = "../../generated_config/account_config.rs"]
+mod account_config;
+use account_config::*;
+
 // The URL for the telemetry server.
 // const STAGING_TELEMETRY_URL: &str = "wss://telemetry.polkadot.io/submit/";
 
@@ -40,6 +44,18 @@ pub fn authority_keys_from_seed(s: &str) -> (AuraId, GrandpaId) {
 
 pub fn development_config() -> Result<ChainSpec, String> {
 	let wasm_binary = WASM_BINARY.ok_or_else(|| "Development wasm binary not available".to_string())?;
+	let account_info = get_account_info();
+
+	// Generate initial PoA authorities
+	let mut init_auths = Vec::new();
+	for seed in account_info.authorities_seeds.iter() {
+	    init_auths.push(authority_keys_from_seed(seed));
+	}
+	// Generate pre-funded accounts
+	let mut pre_funded_accounts = Vec::new();
+	for seed in account_info.pre_funded_seeds.iter() {
+	    pre_funded_accounts.push(get_account_id_from_seed::<sr25519::Public>(seed));
+	}
 
 	Ok(ChainSpec::from_genesis(
 		// Name
@@ -50,18 +66,11 @@ pub fn development_config() -> Result<ChainSpec, String> {
 		move || testnet_genesis(
 			wasm_binary,
 			// Initial PoA authorities
-			vec![
-				authority_keys_from_seed("Alice"),
-			],
+			init_auths.clone(),
 			// Sudo account
-			get_account_id_from_seed::<sr25519::Public>("Alice"),
+			get_account_id_from_seed::<sr25519::Public>(account_info.sudo_account_seed),
 			// Pre-funded accounts
-			vec![
-				get_account_id_from_seed::<sr25519::Public>("Alice"),
-				get_account_id_from_seed::<sr25519::Public>("Bob"),
-				get_account_id_from_seed::<sr25519::Public>("Alice//stash"),
-				get_account_id_from_seed::<sr25519::Public>("Bob//stash"),
-			],
+			pre_funded_accounts.clone(),
 			true,
 		),
 		// Bootnodes

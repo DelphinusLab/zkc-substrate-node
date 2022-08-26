@@ -22,6 +22,10 @@ use pallet_grandpa::fg_primitives;
 use sp_version::RuntimeVersion;
 use hex_literal;
 
+#[path = "../../generated_config/admins_config.rs"]
+mod admins_config;
+use admins_config::*;
+
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
 
@@ -259,13 +263,6 @@ impl pallet_transaction_payment::Config for Runtime {
 impl pallet_sudo::Config for Runtime {
 	type Event = Event;
 	type Call = Call;
-}
-
-fn admins() -> Vec<AccountId> {
-    vec![
-        AccountId::from(hex_literal::hex!["d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d"]),
-        AccountId::from(hex_literal::hex!["be5ddb1579b72e84524fc29e78609e3caf42e85aa118ebfe0b0ad404b5bdd25f"])
-    ]
 }
 
 parameter_types! {
