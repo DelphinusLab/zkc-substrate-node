@@ -5,7 +5,7 @@ edition = '2018'
 homepage = 'https://delphinuslab.com/'
 license = 'Unlicense'
 name = 'pallet-swap'
-repository = 'https://github.com/ZhenXunGe/delphinus-substrate-node'
+repository = 'https://github.com/DelphinusLab/zkc-substrate-node'
 version = '1.0.0'
 
 [package.metadata.docs.rs]
