@@ -123,7 +123,8 @@ pub fn pool_change<T: Config>(
     } else {
         amount_0
             .checked_sub(change_0)
-            .ok_or(Error::<T>::PoolBalanceNotEnough)?
+            .ok_or(Error::<T>::PoolBalanceNotEnough)?;
+            non_zero_pool_amount(amount_0).ok_or(Error::<T>::PoolBalanceNotEnough)?
     };
     let new_amount_1 = if is_add_1 {
         amount_1
@@ -132,7 +133,8 @@ pub fn pool_change<T: Config>(
     } else {
         amount_1
             .checked_sub(change_1)
-            .ok_or(Error::<T>::PoolBalanceNotEnough)?
+            .ok_or(Error::<T>::PoolBalanceNotEnough)?;
+            non_zero_pool_amount(amount_1).ok_or(Error::<T>::PoolBalanceNotEnough)?
     };
     PoolMap::insert(
         pool_index,
@@ -293,6 +295,15 @@ pub fn valid_pool_amount(
 ) -> Option<U256> {
     let maximum = U256::from(1u64) << 99;
     match amount >= maximum {
+        true => None,
+        false => Some(amount),
+    }
+}
+
+pub fn non_zero_pool_amount(
+    amount: Amount
+) -> Option<U256> {
+    match amount <= U256::from(0) {
         true => None,
         false => Some(amount),
     }
