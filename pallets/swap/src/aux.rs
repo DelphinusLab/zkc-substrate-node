@@ -121,7 +121,6 @@ pub fn pool_change<T: Config>(
             .checked_add_on_circuit(change_0)
             .ok_or(Error::<T>::PoolBalanceOverflow)?
     } else {
-        non_zero_pool_amount(amount_0).ok_or(Error::<T>::PoolBalanceNotEnough)?;
         amount_0
             .checked_sub(change_0)
             .ok_or(Error::<T>::PoolBalanceNotEnough)?
@@ -131,7 +130,6 @@ pub fn pool_change<T: Config>(
             .checked_add_on_circuit(change_1)
             .ok_or(Error::<T>::PoolBalanceOverflow)?
     } else {
-        non_zero_pool_amount(amount_1).ok_or(Error::<T>::PoolBalanceNotEnough)?;
         amount_1
             .checked_sub(change_1)
             .ok_or(Error::<T>::PoolBalanceNotEnough)?

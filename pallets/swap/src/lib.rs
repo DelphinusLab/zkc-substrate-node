@@ -466,6 +466,7 @@ decl_module! {
                     ((token1, amount1), (token0, amount0))
                 }
             };
+            non_zero_pool_amount(amount_output).ok_or(Error::<T>::PoolBalanceNotEnough)?;
 
             let mut command = [0u8; 81];
             command[0] = OP_SWAP;
