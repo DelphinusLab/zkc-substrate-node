@@ -298,6 +298,15 @@ pub fn valid_pool_amount(
     }
 }
 
+pub fn non_zero_pool_amount(
+    amount: Amount
+) -> Option<U256> {
+    match amount <= U256::from(0) {
+        true => None,
+        false => Some(amount),
+    }
+}
+
 pub fn valid_input_y_amount(
     liq0: Amount,
     liq1: Amount,
