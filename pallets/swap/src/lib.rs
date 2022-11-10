@@ -108,6 +108,7 @@ decl_event!(
             PoolIndex,
             Reverse,
             Amount,
+            Amount,
         ),
         PoolSupply(
             ReqId,
@@ -496,7 +497,7 @@ decl_module! {
             Self::deposit_event(
                 Event::<T>::Swap(
                     req_id,
-                    sign.0, sign.1, sign.2, nonce, account_index, pool_index, reverse, amount
+                    sign.0, sign.1, sign.2, nonce, account_index, pool_index, reverse, amount, result_amount
                 )
             );
 
