@@ -119,6 +119,7 @@ decl_event!(
             PoolIndex,
             Amount,
             Amount,
+            Amount
         ),
         PoolRetrieve(
             ReqId,
@@ -130,6 +131,7 @@ decl_event!(
             PoolIndex,
             Amount,
             Amount,
+            Amount
         ),
         AddPool(
             ReqId,
@@ -560,7 +562,7 @@ decl_module! {
 
             Self::deposit_event(
                 Event::<T>::PoolSupply(
-                    req_id, sign.0, sign.1, sign.2, nonce, account_index, pool_index, amount0, amount1)
+                    req_id, sign.0, sign.1, sign.2, nonce, account_index, pool_index, amount0, amount1, share_change)
             );
 
             return Ok(());
@@ -619,7 +621,7 @@ decl_module! {
 
             Self::deposit_event(
                 Event::<T>::PoolRetrieve(
-                    req_id, sign.0, sign.1, sign.2, nonce, account_index, pool_index, amount0, amount1
+                    req_id, sign.0, sign.1, sign.2, nonce, account_index, pool_index, amount0, amount1, share_change
                 )
             );
 
