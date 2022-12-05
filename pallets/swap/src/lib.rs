@@ -108,6 +108,7 @@ decl_event!(
             PoolIndex,
             Reverse,
             Amount,
+            Amount,
         ),
         PoolSupply(
             ReqId,
@@ -119,6 +120,7 @@ decl_event!(
             PoolIndex,
             Amount,
             Amount,
+            Amount
         ),
         PoolRetrieve(
             ReqId,
@@ -130,6 +132,7 @@ decl_event!(
             PoolIndex,
             Amount,
             Amount,
+            Amount
         ),
         AddPool(
             ReqId,
@@ -492,11 +495,12 @@ decl_module! {
             balance_set(&account_index, &token_input, new_balance_input);
             balance_set(&account_index, &token_output, new_balance_output);
             NonceMap::<T>::insert(&account, new_nonce);
-
+            //We emit an extra value `result_amount` which contains the output amount of the swap operation. 
+            //This is not passed into the Op/circuit, but is useful for history.
             Self::deposit_event(
                 Event::<T>::Swap(
                     req_id,
-                    sign.0, sign.1, sign.2, nonce, account_index, pool_index, reverse, amount
+                    sign.0, sign.1, sign.2, nonce, account_index, pool_index, reverse, amount, result_amount
                 )
             );
 
@@ -560,7 +564,7 @@ decl_module! {
 
             Self::deposit_event(
                 Event::<T>::PoolSupply(
-                    req_id, sign.0, sign.1, sign.2, nonce, account_index, pool_index, amount0, amount1)
+                    req_id, sign.0, sign.1, sign.2, nonce, account_index, pool_index, amount0, amount1, share_change)
             );
 
             return Ok(());
@@ -619,7 +623,7 @@ decl_module! {
 
             Self::deposit_event(
                 Event::<T>::PoolRetrieve(
-                    req_id, sign.0, sign.1, sign.2, nonce, account_index, pool_index, amount0, amount1
+                    req_id, sign.0, sign.1, sign.2, nonce, account_index, pool_index, amount0, amount1, share_change
                 )
             );
 
