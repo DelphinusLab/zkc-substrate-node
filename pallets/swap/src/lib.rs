@@ -13,10 +13,12 @@ use sp_core::U256;
 mod aux;
 mod errors;
 mod types;
+mod ack_helper;
 
 use aux::*;
 use errors::*;
 use types::*;
+use ack_helper::*;
 
 #[cfg(test)]
 mod mock;
@@ -842,7 +844,7 @@ decl_module! {
         ) -> dispatch::DispatchResult {
             let _who = ensure_signed(origin)?;
 
-            let nack = (1u8 << T::AckAdmins::get().len()) - 1;
+            let nack = get_nack();
 
             let ack = T::AckAdmins::get().iter().position(|x| x.clone() == _who).ok_or(Error::<T>::NoAccess)?;
             let ack_bits = 1u8 << ack;
